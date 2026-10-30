@@ -1,7 +1,14 @@
 FROM python:3.11-slim
 
 # ExaBGP 4.2.x 在 3.11 上安装稳定；tornado 提供 Web/SSE 控制面
-RUN pip install --no-cache-dir "exabgp==4.2.11" tornado
+# tzdata + Asia/Shanghai：容器时间与宿主/控制台对齐（否则日志与命令回显差 8 小时 UTC）
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir "exabgp==4.2.11" tornado \
+    && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo Asia/Shanghai > /etc/timezone
+
+ENV TZ=Asia/Shanghai
 
 WORKDIR /exabgp
 
