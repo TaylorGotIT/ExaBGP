@@ -38,6 +38,12 @@ SOURCES_DIR = PERSIST_DIR + "/sources"
 ROUTEGROUPS_DIR = PERSIST_DIR + "/routegroups"
 LEGACY_CACHE_FILE = PERSIST_DIR + "/china_routes_local_bak.json"   # v5 旧快照（迁移用）
 
+# ============ 日志策略（大小 + 留存天数，环境变量可配） ============
+LOG_DIR = os.environ.get("LOG_DIR", PERSIST_DIR + "/logs")          # 按天日志文件目录
+LOG_MAX_BYTES = int(os.environ.get("LOG_MAX_BYTES", str(5 * 1024 * 1024)))   # 单日文件上限（默认 5MB）
+LOG_RETENTION_DAYS = int(os.environ.get("LOG_RETENTION_DAYS", "7"))          # 留存天数（默认 7 天）
+_LAST_LOG_DATE = ""                                                    # 跨天检测用
+
 # ============ SSE 实时日志广播中心 ============
 LOG_HISTORY = deque(maxlen=500)   # 历史日志环形缓冲（新客户端接入先补发；元素: {t, tag, text}）
 SSE_CLIENTS = set()               # 活跃 SSE 客户端队列集合
@@ -81,8 +87,54 @@ def log(msg):
     item = {"t": time.time(), "tag": infer_tag(msg), "text": text}
     print(text, file=sys.stderr)
     LOG_HISTORY.append(item)
+    _write_disk_log(item)
     # 线程安全：无论是否在工作线程，都经 add_callback 回事件循环再广播
     tornado.ioloop.IOLoop.current().add_callback(sse_broadcast, {"type": "log", "tag": item["tag"], "message": text})
+
+def _write_disk_log(item):
+    """按天写入磁盘日志：{LOG_DIR}/app-YYYY-MM-DD.log；单日文件超 LOG_MAX_BYTES 后停止写入（保持大小受控）"""
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        path = os.path.join(LOG_DIR, "app-" + time.strftime("%Y-%m-%d", time.localtime(item["t"])) + ".log")
+        try:
+            if os.path.getsize(path) >= LOG_MAX_BYTES:
+                return
+        except OSError:
+            pass
+        line = "{} [{}] {}\n".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["t"])), item["tag"], item["text"])
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+def _clean_old_logs():
+    """清理超过 LOG_RETENTION_DAYS 天的日志文件（启动时 + 跨天时调用）"""
+    try:
+        if not os.path.isdir(LOG_DIR):
+            return
+        cutoff = time.time() - LOG_RETENTION_DAYS * 86400
+        for fn in os.listdir(LOG_DIR):
+            if not (fn.startswith("app-") and fn.endswith(".log")):
+                continue
+            try:
+                ft = time.mktime(time.strptime(fn[4:-4], "%Y-%m-%d"))
+            except Exception:
+                continue
+            if ft < cutoff:
+                try:
+                    os.remove(os.path.join(LOG_DIR, fn))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+def check_log_rotation():
+    """跨天检测：日期变化时清理过期日志文件"""
+    global _LAST_LOG_DATE
+    today = time.strftime("%Y-%m-%d")
+    if today != _LAST_LOG_DATE:
+        _LAST_LOG_DATE = today
+        _clean_old_logs()
 
 # ============ 全局状态与配置 ============
 SOURCES = {}       # id -> {id,name,url,interval,enabled,routes:set,last_status,last_time,next_due}
@@ -564,11 +616,12 @@ async def _refresh_all_coro():
             await source_refresh_job(sid)
 
 def scheduler_tick():
-    """每 TICK 检查各源是否到期，到期则调度刷新（支持运行时增减源）"""
+    """每 TICK 检查各源是否到期，到期则调度刷新（支持运行时增减源）；并做日志跨天清理"""
     now = time.time()
     for sid, s in SOURCES.items():
         if s["enabled"] and now >= s["next_due"]:
             tornado.ioloop.IOLoop.current().add_callback(source_refresh_job, sid)
+    check_log_rotation()
 
 # ============ 启动自愈 ============
 async def announce_union_to_groups(only_id=None):
@@ -1163,6 +1216,8 @@ async def run_server():
 
     # 首次/启动时生成 exabgp.conf（分组变更时由 API 钩子重生成 + SIGHUP 热重载）
     regenerate_conf("启动", notify=False)
+    # 启动即清理过期日志文件（留存策略生效）
+    _clean_old_logs()
 
     # 开机自愈：0.5s 回填磁盘快照 → 6s 首次在线全量 → 之后按各源频率差分
     tornado.ioloop.IOLoop.current().call_later(0.5, restore_sources_from_disk)
