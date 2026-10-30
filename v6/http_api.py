@@ -186,15 +186,16 @@ def read_api_stdin_thread():
         pass
 
 def poll_neighbor_states():
-    """监控联动：服务器模式由 exabgp neighbor-changes 事件驱动（conf 已开启 api{neighbor-changes}，
-    状态变化主动推送，无需轮询 show 命令）；演示模式模拟 up 事件供面板联动演示"""
-    if not DEMO_MODE:
+    """监控联动（双通道）：
+    ① 轮询：发全局 show neighbor summary（不带 neighbor 前缀——4.2.11 对带前缀的 show 命令
+       会丢弃子命令，实测 exabgpcli 不带前缀正常），解析表格行刷新全部邻居状态；
+    ② 事件：conf 邻居块 api{neighbor-changes} 推送 up/down 事件（read_api_stdin_thread 实时接收）。
+    演示模式：模拟所有邻居的 summary 行。"""
+    if DEMO_MODE:
+        demo_simulate_responses(["show neighbor summary\n"])
         return
     try:
-        with open(EXABGP_OUT, "a", encoding="utf-8") as f:
-            for g in selected_groups():
-                for n in g["neighbors"]:
-                    f.write(f"neighbor {n} up\n")
+        write_to_pipe(["show neighbor summary\n"])
     except Exception:
         pass
 
@@ -398,15 +399,18 @@ def demo_simulate_responses(commands):
     try:
         with open(EXABGP_OUT, "a", encoding="utf-8") as f:
             for cmd in commands:
-                m = re.match(r"^neighbor (\S+) show neighbor summary", cmd)
+                m = re.match(r"^show neighbor summary", cmd)
                 if m:
-                    ip = m.group(1)
-                    f.write(f"{ip:<15} 65001      0:01:29 established          0          0\n")
+                    for g in selected_groups():
+                        for ip in g["neighbors"]:
+                            f.write(f"{ip:<15} {g.get('peer_as') or '65001'}     0:01:29 established          0          0\n")
                     continue
-                m = re.match(r"^neighbor (\S+) show adj-rib out", cmd)
+                m = re.match(r"^show adj-rib out", cmd)
                 if m:
-                    for p in sorted(union_routes())[:5]:
-                        f.write(f"{m.group(1)} ipv4 unicast {p}\n")
+                    for g in selected_groups():
+                        for ip in g["neighbors"]:
+                            for p in sorted(union_routes())[:5]:
+                                f.write(f"{ip} ipv4 unicast {p}\n")
                     continue
     except Exception:
         pass
@@ -1047,6 +1051,9 @@ class ControlHandler(tornado.web.RequestHandler):
                 raise ValueError("exabgp 4.x 不支持 show route 命令，请改用 show adj-rib out 查看已发布路由")
             if action == "teardown" and not ip:
                 cmds = ["teardown all\n"]
+            elif action in ("show_neighbor", "show_adj_rib_out"):
+                # 4.2.11：show 类命令不带 neighbor 前缀（带前缀会丢弃子命令，实测 exabgpcli 无前缀正常）
+                cmds = [f"{verbs[action]}\n"]
             else:
                 if not ip:
                     raise ValueError("请指定邻居 IP")
