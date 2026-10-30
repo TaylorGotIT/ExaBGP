@@ -112,6 +112,18 @@ def handle_output_line(line):
         if old and old != st:
             log(f"🔔 邻居 {ip}: {old} → {st}")
         return
+    # exabgp neighbor-changes 事件（conf 邻居块 api{neighbor-changes} 推送）：neighbor <ip> up / down - <reason>
+    m = re.match(r"^neighbor (\S+) (up|down)(?: - (.*))?$", line)
+    if m:
+        ip, ev, reason = m.group(1), m.group(2), (m.group(3) or "").strip()
+        st = "Established" if ev == "up" else "Down"
+        old = NEIGHBOR_STATES.get(ip, {}).get("state")
+        st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
+        st0["state"] = st
+        st0["updated"] = time.time()
+        if old and old != st:
+            log(f"🔔 邻居 {ip}: {old} → {st}" + (f"（{reason}）" if reason else ""))
+        return
     m = re.match(r"^neighbor (\S+) (Established|Idle|Active|Connect|OpenSent|OpenConfirm|Down)\s*$", line)
     if m:
         ip, st = m.group(1), m.group(2)
@@ -158,18 +170,33 @@ def read_output_thread():
         except Exception:
             time.sleep(1.0)
 
+def read_api_stdin_thread():
+    """exabgp API 程序通道（仅服务器模式）：exabgp fork 本程序时 stdin 是 exabgp 的响应/事件管道——
+    邻居状态变化由 conf 的 api{neighbor-changes} 主动推送（neighbor <ip> up / down - <reason>），
+    完全绕开 show neighbor 子命令，事件驱动刷新监控表。演示模式无该管道，跳过。"""
+    if DEMO_MODE:
+        return
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            handle_output_line(line)
+    except Exception:
+        pass
+
 def poll_neighbor_states():
-    """监控联动：每轮询周期向 exabgp 发 show neighbor summary，刷新邻居状态表（配合读线程解析）"""
-    sent = 0
-    for g in selected_groups():
-        for n in g["neighbors"]:
-            try:
-                write_to_pipe([f"neighbor {n} show neighbor summary\n"])
-                sent += 1
-            except Exception:
-                pass
-    if sent:
-        log(f"👁️ 邻居状态轮询：已向 {sent} 个邻居发送 show neighbor")
+    """监控联动：服务器模式由 exabgp neighbor-changes 事件驱动（conf 已开启 api{neighbor-changes}，
+    状态变化主动推送，无需轮询 show 命令）；演示模式模拟 up 事件供面板联动演示"""
+    if not DEMO_MODE:
+        return
+    try:
+        with open(EXABGP_OUT, "a", encoding="utf-8") as f:
+            for g in selected_groups():
+                for n in g["neighbors"]:
+                    f.write(f"neighbor {n} up\n")
+    except Exception:
+        pass
 
 def get_runtime_config():
     return {
@@ -1135,8 +1162,10 @@ async def run_server():
     tornado.ioloop.IOLoop.current().call_later(6.0, lambda: tornado.ioloop.IOLoop.current().add_callback(_refresh_all_coro))
     tornado.ioloop.PeriodicCallback(scheduler_tick, cfg["TICK_SECONDS"] * 1000).start()
 
-    # 监控联动：读线程监听 exabgp.out 响应 + 10s 邻居状态轮询
+    # 监控联动：读线程监听 exabgp.out 响应；API 程序通道（stdin）接收 neighbor-changes 事件；
+    # 演示模式模拟 up 事件（10s），服务器模式事件驱动
     threading.Thread(target=read_output_thread, daemon=True).start()
+    threading.Thread(target=read_api_stdin_thread, daemon=True).start()
     tornado.ioloop.PeriodicCallback(poll_neighbor_states, 10_000).start()
 
     await asyncio.Event().wait()
