@@ -144,3 +144,11 @@ neighbor <邻居IP> {
 4. **数据卷**：`/exabgp/data` 已声明 VOLUME，路由快照/配置持久化于卷内，容器重建不丢数据。
 5. **API 无鉴权**：`9550` 监听 0.0.0.0，生产建议仅在受控网络暴露或加 Token。
 6. **Windows 演示**：`demo-run/` 为本地副本（普通文件模拟 FIFO，无法跑 exabgp 本体），用于验证引擎与 conf 生成逻辑；`/api/conf` 可在演示环境预览生成的配置。
+
+## 未来规划
+
+- **Nginx / 服务联动健康检查（healthcheck）**：独立脚本周期检测本机服务端口（如 80），状态变化时通过引擎下发 `announce_route` / `withdraw_route`——
+  - 服务 UP → 通告业务 VIP（如 `100.10.0.100/32`）给 CE 邻居，路由器正常引入流量；
+  - 服务 DOWN → 撤出该路由，路由器自动重定向流量，不再引入故障节点；
+  - 状态只在变化时动作（幂等），配合容器 `--network host` 检测宿主服务。
+  - 实现要点：`/api/control` 扩展 announce/withdraw 动词、entrypoint 在 `HC_ENABLED=1` 时后台拉起、环境变量 `HC_CHECK_PORT / HC_PREFIX / HC_NEIGHBOR / HC_NEXT_HOP / HC_COMMUNITY / HC_INTERVAL`。当前版本未启用（需求暂缓，代码已 revert 保留在 git 历史 `b682b06`）。
