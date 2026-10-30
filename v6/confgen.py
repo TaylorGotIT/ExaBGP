@@ -126,12 +126,28 @@ def render_conf_text(config, runtime):
     return "\n".join(parts) + "\n"
 
 
+def _valid_ipv4(s):
+    try:
+        return __import__("ipaddress").ip_address(str(s).strip()).version == 4
+    except (ValueError, TypeError):
+        return False
+
+
 def render_from_file(config_file=None, conf_file=None, write=True):
-    """主入口：读配置 → 渲染文本 →（可选）原子写盘 → 返回文本"""
+    """主入口：读配置 → 校验邻居/覆盖地址 → 渲染文本 →（可选）原子写盘 → 返回文本"""
     cfg_file, cnf_file = default_paths()
     config_file = config_file or cfg_file
     conf_file = conf_file or cnf_file
     config = load_config(config_file)
+    # 防御：邻居 IP / 覆盖地址非法时拒绝生成，避免把坏 conf 交给 exabgp
+    for g in config.get("groups", []):
+        for ip in g.get("neighbors", []):
+            if not _valid_ipv4(ip):
+                raise ValueError(f"分组 [{g.get('name', g['id'])}] 邻居 IP 非法: {ip}（须为合法 IPv4 地址）")
+        for k, label in (("next_hop", "下一跳"), ("local_address", "本地地址"), ("router_id", "Router-ID")):
+            v = str(g.get(k) or "").strip()
+            if v and not _valid_ipv4(v):
+                raise ValueError(f"分组 [{g.get('name', g['id'])}] {label} 非法: {v}")
     text = render_conf_text(config, runtime_defaults())
     if write and conf_file:
         os.makedirs(os.path.dirname(conf_file), exist_ok=True)

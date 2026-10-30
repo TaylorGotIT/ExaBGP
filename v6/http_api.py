@@ -305,6 +305,13 @@ def save_routegroup_prefixes(rgid):
 def parse_prefixes_text(text):
     return {p for p in re.split(r"[\s,，;；]+", text or "") if p}
 
+def valid_ipv4(s):
+    """校验是否为合法 IPv4 地址（用于分组邻居/覆盖地址防非法值写入 conf）"""
+    try:
+        return ipaddress.ip_address(s.strip()).version == 4
+    except ValueError:
+        return False
+
 def validate_prefix(p):
     """校验并规范化 IPv4 前缀（严格模式关：带主机位会自动归一为网络地址）"""
     p = (p or "").strip()
@@ -317,37 +324,20 @@ def validate_prefix(p):
     return str(net)
 
 # ============ exabgp.conf 按分组模板自动生成 ============
-EXABGP_PID_FILE = os.environ.get("EXABGP_PID_FILE", "/run/exabgp/exabgp.pid")
-
 def regenerate_conf(reason="", notify=True):
-    """按当前分组配置重新生成 exabgp.conf；向 exabgp 发 SIGHUP 热重载。
-    优先读 EXABGP_PID_FILE（systemd 独立进程模式）；无 pid 文件时回退容器 PID1 模式。"""
+    """按当前分组配置重新生成 exabgp.conf，并通过 API 管道向 exabgp 发送 reload 命令热重载。
+    注意：exabgp 的 SIGHUP 语义是优雅关停（shutdown），不是重载；正确的热重载是 API 命令 reload
+    （重读配置文件，尽量不中断已建立会话）。"""
     try:
         text = confgen.render_from_file(CONFIG_FILE, conf_file=CONF_FILE, write=True)
         log(f"🔄 exabgp.conf 已重生成（{reason}），邻居 {confgen.count_neighbors(CONFIG_FILE)} 个")
         if notify:
-            sig = getattr(signal, "SIGHUP", None)
-            if not sig:
-                return
-            target = None
             try:
-                if os.path.exists(EXABGP_PID_FILE):
-                    with open(EXABGP_PID_FILE) as f:
-                        target = int(f.read().strip())
-            except Exception:
-                target = None
-            if target and target > 1:
-                try:
-                    os.kill(target, sig)
-                    log(f"🔔 已向 exabgp(PID {target}) 发送 SIGHUP，触发配置热重载")
-                except Exception as e:
-                    log(f"⚠️ 无法向 exabgp 发送 SIGHUP（{e}），重启 exabgp 后生效")
-            else:
-                try:
-                    os.kill(1, sig)
-                    log("🔔 已向 exabgp(PID1) 发送 SIGHUP，触发配置热重载")
-                except Exception as e:
-                    log(f"⚠️ 无法向 exabgp 发送 SIGHUP（{e}），重启后生效")
+                with open(EXABGP_IN, "w") as f:
+                    f.write("reload\n")
+                log("🔔 已向 exabgp 发送 reload，触发配置热重载（不中断会话）")
+            except Exception as e:
+                log(f"⚠️ 无法向 exabgp 发送 reload（{e}），重启 exabgp 后生效")
     except Exception as e:
         log(f"❌ exabgp.conf 重生成失败: {e}")
 
@@ -635,6 +625,13 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                 neighbors = [x.strip() for x in raw.replace("，", ",").split(",") if x.strip()]
                 if not neighbors:
                     raise ValueError("neighbors 不能为空（逗号分隔多个 IP）")
+                for nb in neighbors:
+                    if not valid_ipv4(nb):
+                        raise ValueError(f"邻居 IP 非法: {nb}（须为合法 IPv4 地址，如 192.168.75.241）")
+                for k, label in (("next_hop", "下一跳"), ("local_address", "本地地址"), ("router_id", "Router-ID")):
+                    v = str(data.get(k, "")).strip()
+                    if v and not valid_ipv4(v):
+                        raise ValueError(f"{label} 非法: {v}（须为合法 IPv4 地址）")
                 gid = "g" + uuid.uuid4().hex[:6]
                 GROUPS[gid] = {
                     "id": gid, "name": name, "neighbors": neighbors,
@@ -664,14 +661,26 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                     ns = [x.strip() for x in raw.replace("，", ",").split(",") if x.strip()]
                     if not ns:
                         raise ValueError("neighbors 不能为空")
+                    for nb in ns:
+                        if not valid_ipv4(nb):
+                            raise ValueError(f"邻居 IP 非法: {nb}（须为合法 IPv4 地址）")
                     g["neighbors"] = ns
                 if "next_hop" in data:
-                    g["next_hop"] = str(data["next_hop"]).strip()
+                    v = str(data["next_hop"]).strip()
+                    if v and not valid_ipv4(v):
+                        raise ValueError(f"下一跳非法: {v}（须为合法 IPv4 地址）")
+                    g["next_hop"] = v
                 if "community" in data:
                     g["community"] = str(data["community"]).strip()
-                for k in ("local_as", "peer_as", "local_address", "router_id"):
+                for k in ("local_as", "peer_as"):
                     if k in data:
                         g[k] = str(data[k]).strip()
+                for k in ("local_address", "router_id"):
+                    if k in data:
+                        v = str(data[k]).strip()
+                        if v and not valid_ipv4(v):
+                            raise ValueError(f"{'本地地址' if k == 'local_address' else 'Router-ID'} 非法: {v}（须为合法 IPv4 地址）")
+                        g[k] = v
                 if "enabled" in data and bool(data["enabled"]) != g["enabled"]:
                     if bool(data["enabled"]):
                         g["enabled"] = True
