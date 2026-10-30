@@ -11,7 +11,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Microsoft YaHei',system-ui,sans-serif;padding:16px;font-size:14px}
-  .wrap{max-width:1180px;margin:0 auto}
+  .wrap{width:100%;margin:0 auto}
   header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
   header h1{font-size:18px;font-weight:700;letter-spacing:.5px}
   .badge{background:#17233f;border:1px solid var(--border);color:var(--sky);border-radius:20px;padding:3px 12px;font-size:12px}
@@ -23,7 +23,7 @@
   .card .v{font-size:22px;font-weight:700;line-height:1.2;word-break:break-all}
   .card .v.small{font-size:16px;font-weight:600}
   .card .v.ok{color:var(--green)} .card .v.bad{color:var(--red)} .card .v.warn{color:var(--amber)}
-  .grid2{display:grid;grid-template-columns:1fr 400px;gap:12px;margin-bottom:12px}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:12px;margin-bottom:12px}
   .grid3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
   .panel h2{font-size:14px;font-weight:700;margin-bottom:10px;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
