@@ -547,7 +547,10 @@
     fetch("/api/responses").then(function(r){return r.json();}).then(function(d){
       const box=$("ctlRes"); box.innerHTML="";
       if(!d.responses||!d.responses.length){box.textContent="（暂无响应，执行 show 类命令后此处回显）";return;}
-      d.responses.slice(0,30).forEach(function(x){box.appendChild(el("div","",x.line));});
+      d.responses.slice(0,30).forEach(function(x){
+        const ts=x.t?new Date(x.t*1000).toLocaleTimeString("zh-CN",{hour12:false}):"—";
+        box.appendChild(el("div","","["+ts+"] "+x.line));
+      });
     }).catch(function(){});
   }
 
