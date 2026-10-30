@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExaBGP 多源多组路由控制台</title>
+<style>
+  :root{
+    --bg:#0c1322; --panel:#131c30; --panel2:#0f1728; --border:#243354; --text:#dbe4f5;
+    --muted:#8ea0c0; --accent:#6d8dff; --green:#2dd4a7; --amber:#f5b85c; --red:#f4716e; --sky:#5cc8f5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Microsoft YaHei',system-ui,sans-serif;padding:16px;font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  header h1{font-size:18px;font-weight:700;letter-spacing:.5px}
+  .badge{background:#17233f;border:1px solid var(--border);color:var(--sky);border-radius:20px;padding:3px 12px;font-size:12px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle}
+  .dot.off{background:#5b6b82}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .card .k{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .card .v{font-size:22px;font-weight:700;line-height:1.2;word-break:break-all}
+  .card .v.small{font-size:16px;font-weight:600}
+  .card .v.ok{color:var(--green)} .card .v.bad{color:var(--red)} .card .v.warn{color:var(--amber)}
+  .grid2{display:grid;grid-template-columns:1fr 400px;gap:12px;margin-bottom:12px}
+  .grid3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .panel h2{font-size:14px;font-weight:700;margin-bottom:10px;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .panel h2 .hint{font-weight:400;font-size:12px;color:var(--muted)}
+  #log{height:420px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,'Courier New',monospace;font-size:12.5px;line-height:1.65}
+  .ln{white-space:pre-wrap;word-break:break-all}
+  .ln .t{color:var(--muted)} .ln.ok{color:var(--green)} .ln.err{color:var(--red)} .ln.warn{color:var(--amber)} .ln.run{color:var(--sky)}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  button{background:#1c2a4a;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 12px;font-size:12.5px;cursor:pointer}
+  button:hover{background:#24355e;border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#081020;border-color:transparent;font-weight:600}
+  button.danger:hover{background:#5a2430;border-color:var(--red)}
+  button.sm{padding:2px 6px;font-size:11.5px;white-space:nowrap}
+  input,select,textarea{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12.5px;width:100%;min-width:0}
+  textarea{font-family:Consolas,monospace;resize:vertical}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  .row{display:grid;gap:4px;align-items:center;margin-bottom:6px}
+  .row.src{grid-template-columns:70px minmax(0,1fr) 60px 40px 140px auto auto auto}
+  .row.grp{grid-template-columns:100px minmax(0,1fr) 120px 120px 46px auto auto}
+  .row.rg{grid-template-columns:34px 120px 56px minmax(0,1fr) minmax(0,1fr) auto auto}
+  .row .meta{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .num{text-align:center;font-weight:600;font-size:12px}
+  .chk{width:16px;height:16px;accent-color:var(--accent);justify-self:center}
+  .formline{display:grid;gap:8px;margin-top:8px}
+  .formline.addsrc{grid-template-columns:110px minmax(0,1fr) 90px 80px auto}
+  .formline.addgrp1{grid-template-columns:repeat(4,minmax(0,1fr)) auto}
+  .formline.addgrp2{grid-template-columns:minmax(0,1fr) 140px 140px}
+  .formline.addrg{grid-template-columns:130px minmax(0,1fr) 150px 150px auto}
+  .sec{margin-bottom:12px}
+  .mini-label{font-size:11px;color:var(--muted);margin-bottom:2px}
+  .status-text{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rgbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .rgbar select{width:280px}
+  ::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:#2a3a5e;border-radius:4px}
+  @media (max-width:960px){ .grid2,.grid3{grid-template-columns:1fr} .cards{grid-template-columns:repeat(2,1fr)} .row.src{grid-template-columns:70px 1fr 60px 40px auto auto auto} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ExaBGP 多源 · 多组 · 路由组控制台</h1>
+    <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
+    <span class="badge">Tornado API :9550</span>
+  </header>
+
+  <div class="cards">
+    <div class="card"><div class="k">已缓存路由数（全库并集）</div><div class="v" id="kpiCount">–</div></div>
+    <div class="card"><div class="k">最近执行状态</div><div class="v small" id="kpiStatus">–</div></div>
+    <div class="card"><div class="k">最近执行时间</div><div class="v small" id="kpiTime">–</div></div>
+    <div class="card"><div class="k">数据源 / 分组 / 路由组</div><div class="v" id="kpiSrcGrp">–</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>实时日志 <span class="hint">（SSE /api/logs 推送）</span></h2>
+      <div id="log"><div class="ln run">连接中，等待日志流…</div></div>
+      <div class="toolbar">
+        <button id="btnClear">清空显示</button>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:12.5px">
+          <input type="checkbox" id="autoScroll" checked style="width:auto"> 自动滚动
+        </label>
+        <span style="flex:1"></span>
+        <button id="btnRefresh" class="primary">立即刷新全部数据源</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel sec">
+        <h2>手动发布 / 撤回</h2>
+        <label>目标分组</label>
+        <select id="grpSel" style="margin-bottom:8px"><option value="">全部启用组</option></select>
+        <label>路由前缀（每行一个，如 192.0.2.0/24）</label>
+        <textarea id="manualRoutes" rows="4" placeholder="192.0.2.0/24&#10;198.18.0.0/15" style="margin-bottom:8px"></textarea>
+        <div class="toolbar">
+          <button id="btnAnnounce" class="primary">发布</button>
+          <button id="btnWithdraw">撤回</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>运行时参数快照</h2>
+        <div id="cfgSnap" style="font-family:Consolas,monospace;font-size:12.5px;line-height:1.8;color:var(--muted)">
+          <div>加载中…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="panel">
+      <h2>数据源管理 <span class="hint">（独立 URL / 更新频率 / 启停，修改立即生效）</span></h2>
+      <div id="srcList"></div>
+      <div class="formline addsrc">
+        <div><div class="mini-label">名称</div><input id="addSrcName" placeholder="如：电信源"></div>
+        <div><div class="mini-label">URL *</div><input id="addSrcUrl" placeholder="https://…/china.txt"></div>
+        <div><div class="mini-label">间隔（秒）*</div><input id="addSrcInterval" type="number" value="3600" min="10"></div>
+        <div><div class="mini-label">启用</div><input id="addSrcEnabled" type="checkbox" class="chk" checked style="margin-top:2px"></div>
+        <div style="align-self:end"><button id="btnAddSrc" class="primary">添加源</button></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>分组邻居传播 <span class="hint">（组名=客户ID+站点号+线路序号）</span></h2>
+      <div id="grpList"></div>
+      <div class="formline addgrp1" style="margin-top:10px">
+        <div><div class="mini-label">客户ID *</div><input id="addGrpCust" placeholder="60001"></div>
+        <div><div class="mini-label">站点号 *</div><input id="addGrpSite" placeholder="A"></div>
+        <div><div class="mini-label">线路序号 *</div><input id="addGrpLine" placeholder="1"></div>
+        <div><div class="mini-label">组名（自动拼接）</div><input id="addGrpName" placeholder="60001A1"></div>
+        <div style="align-self:end"><button id="btnAddGrp" class="primary">添加组</button></div>
+      </div>
+      <div class="formline addgrp2">
+        <div><div class="mini-label">邻居 IP *（逗号分隔多个）</div><input id="addGrpNeighbors" placeholder="192.168.75.242,192.168.75.243"></div>
+        <div><div class="mini-label">下一跳 *</div><input id="addGrpNh" placeholder="10.255.0.1"></div>
+        <div><div class="mini-label">属性 community</div><input id="addGrpComm" placeholder="65000:200"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>IP 路由组 <span class="hint">（勾选 → 发布/撤回至指定分组邻居；路由组可自带下一跳/属性覆盖目标组默认值）</span></h2>
+    <div class="rgbar">
+      <label style="margin:0">目标分组</label>
+      <select id="rgTarget"><option value="">全部启用组</option></select>
+      <button id="btnRgAnnounce" class="primary">发布选中路由组</button>
+      <button id="btnRgWithdraw">撤回选中路由组</button>
+    </div>
+    <div id="rgList"></div>
+    <div class="formline addrg" style="margin-top:10px">
+      <div><div class="mini-label">名称 *</div><input id="addRgName" placeholder="如：office365"></div>
+      <div><div class="mini-label">URL（可选，拉取前缀）</div><input id="addRgUrl" placeholder="https://…/ips.txt"></div>
+      <div><div class="mini-label">下一跳（可选覆盖）</div><input id="addRgNh" placeholder="x.x.x.x"></div>
+      <div><div class="mini-label">属性（可选覆盖）</div><input id="addRgComm" placeholder="65000:777"></div>
+      <div style="align-self:end"><button id="btnAddRg" class="primary">添加路由组</button></div>
+    </div>
+    <div class="mini-label" style="margin-top:8px">前缀列表（无 URL 时必填；每行一个或逗号分隔）</div>
+    <textarea id="addRgPrefixes" rows="3" placeholder="13.107.6.0/24&#10;52.96.0.0/14"></textarea>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  let SOURCES=[], GROUPS=[], ROUTEGROUPS=[];
+  const $=id=>document.getElementById(id);
+  function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
+
+  // ---------- 日志 ----------
+  const logBox=$("log");
+  function appendLog(line){
+    let cls="", tag="";
+    const m=line.match(/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/);
+    if(m){tag=m[1]; line=line.slice(m[0].length).trim();}
+    if(/❌|错误|失败/.test(line))cls="err";
+    else if(/⚠️|警告|熔断/.test(line))cls="warn";
+    else if(/🎉|成功|✅|⚡⚡|已撤回|回填/.test(line))cls="ok";
+    else if(/⏳/.test(line))cls="run";
+    const d=el("div","ln "+cls);
+    if(tag){const t=el("span","t","["+tag+"] ");d.appendChild(t);}
+    d.appendChild(document.createTextNode(line));
+    logBox.appendChild(d);
+    while(logBox.children.length>500)logBox.removeChild(logBox.firstChild);
+    if($("autoScroll").checked)logBox.scrollTop=logBox.scrollHeight;
+  }
+
+  // ---------- KPI ----------
+  function renderKpi(d){
+    $("kpiCount").textContent=d.cached_count;
+    const st=d.last_status||"–";
+    const kp=$("kpiStatus");
+    kp.textContent=st;
+    kp.className="v small";
+    if(/失败|错误|熔断/.test(st))kp.classList.add("bad");
+    else if(/成功|回填/.test(st))kp.classList.add("ok");
+    else kp.classList.add("warn");
+    $("kpiTime").textContent=d.last_time||"–";
+    $("kpiSrcGrp").textContent=(d.sources||[]).length+" 源 / "+(d.groups||[]).length+" 组 / "+(d.routegroups||[]).length+" 路由组";
+    const cfg=d.config||{};
+    $("cfgSnap").innerHTML="";
+    [["BATCH_SIZE",cfg.BATCH_SIZE],["调度周期",cfg.TICK_SECONDS+"s"],["最小间隔",cfg.MIN_INTERVAL+"s"]].forEach(function(kv){
+      const r=el("div");r.appendChild(el("span",null,kv[0]+": "));r.appendChild(el("span",null,String(kv[1])));
+      $("cfgSnap").appendChild(r);
+    });
+    const gs=el("div","","分组邻居一览：");
+    $("cfgSnap").appendChild(gs);
+    (d.groups||[]).forEach(function(g){
+      $("cfgSnap").appendChild(el("div","","  "+(g.enabled?"✔":"✘")+" "+g.name+" → "+g.next_hop+" ["+g.community+"]"));
+    });
+    const rs=el("div","","路由组一览：");
+    $("cfgSnap").appendChild(rs);
+    (d.routegroups||[]).forEach(function(rg){
+      $("cfgSnap").appendChild(el("div","","  "+(rg.next_hop?("→"+rg.next_hop+" "):"")+" "+rg.name+"（"+rg.prefixes_count+" 条）"));
+    });
+  }
+
+  function isEditing(){
+    const a=document.activeElement;
+    return a && a.tagName==="INPUT" && a.closest("#srcList,#grpList,#rgList");
+  }
+
+  function fillGroupSelects(){
+    const opts=function(sel){
+      sel.innerHTML="";
+      const all=el("option"); all.value=""; all.textContent="全部启用组"; sel.appendChild(all);
+      GROUPS.forEach(function(gr){
+        const o=el("option"); o.value=gr.id; o.textContent=(gr.enabled?"":"[停用] ")+gr.name+" ("+gr.neighbors.join(",")+")"; sel.appendChild(o);
+      });
+    };
+    opts($("grpSel")); opts($("rgTarget"));
+  }
+
+  // ---------- 数据源表 ----------
+  function renderSources(){
+    const box=$("srcList"); box.innerHTML="";
+    if(!SOURCES.length){box.appendChild(el("div","status-text","暂无数据源，在下方添加。"));}
+    SOURCES.forEach(function(s){
+      const r=el("div","row src");
+      const nm=el("input"); nm.value=s.name; nm.dataset.k="name";
+      const ur=el("input"); ur.value=s.url; ur.dataset.k="url"; ur.title=s.url;
+      const iv=el("input"); iv.type="number"; iv.min="10"; iv.value=s.interval; iv.dataset.k="interval";
+      const en=el("input"); en.type="checkbox"; en.checked=s.enabled; en.dataset.k="enabled"; en.className="chk";
+      const st=el("div","status-text",s.last_status); st.title=s.last_time+" · 本源 "+s.routes_count+" 条";
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveSource(s.id);};
+      const rf=el("button","sm","刷新"); rf.onclick=function(){refreshSource(s.id);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteSource(s.id);};
+      [nm,ur,iv,en,st,sv,rf,dl].forEach(function(c){r.appendChild(c);});
+      box.appendChild(r);
+    });
+  }
+
+  function readRow(id,prefix){
+    const obj={id:id};
+    document.querySelectorAll("#"+prefix+"List .row."+prefix+" [data-k]").forEach(function(inp){
+      const k=inp.dataset.k;
+      if(k==="enabled")obj[k]=inp.checked;
+      else if(k==="interval")obj[k]=parseInt(inp.value,10);
+      else obj[k]=inp.value.trim();
+    });
+    return obj;
+  }
+  function saveSource(id){post("/api/sources",{action:"update",...readRow(id,"src")}).then(loadStatus);}
+  function refreshSource(id){post("/api/sources",{action:"refresh",id:id}).then(loadStatus);}
+  function deleteSource(id){post("/api/sources",{action:"delete",id:id}).then(loadStatus);}
+
+  // ---------- 分组表 ----------
+  function renderGroups(){
+    const box=$("grpList"); box.innerHTML="";
+    if(!GROUPS.length){box.appendChild(el("div","status-text","暂无分组，在下方添加。"));}
+    GROUPS.forEach(function(g){
+      const r=el("div","row grp");
+      const nm=el("input"); nm.value=g.name; nm.dataset.k="name";
+      const nb=el("input"); nb.value=g.neighbors.join(","); nb.dataset.k="neighbors";
+      const nh=el("input"); nh.value=g.next_hop; nh.dataset.k="next_hop";
+      const cm=el("input"); cm.value=g.community; cm.dataset.k="community";
+      const en=el("input"); en.type="checkbox"; en.checked=g.enabled; en.dataset.k="enabled"; en.className="chk";
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveGroup(g.id);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteGroup(g.id);};
+      [nm,nb,nh,cm,en,sv,dl].forEach(function(c){r.appendChild(c);});
+      box.appendChild(r);
+    });
+  }
+  function saveGroup(id){post("/api/groups",{action:"update",...readRow(id,"grp")}).then(loadStatus);}
+  function deleteGroup(id){post("/api/groups",{action:"delete",id:id}).then(loadStatus);}
+
+  // ---------- 路由组表 ----------
+  function renderRouteGroups(){
+    const box=$("rgList"); box.innerHTML="";
+    if(!ROUTEGROUPS.length){box.appendChild(el("div","status-text","暂无路由组，在下方添加。"));}
+    ROUTEGROUPS.forEach(function(rg){
+      const r=el("div","row rg");
+      const ch=el("input"); ch.type="checkbox"; ch.className="chk rg-chk"; ch.dataset.id=rg.id;
+      const nm=el("input"); nm.value=rg.name; nm.dataset.k="name";
+      const ct=el("div","num",String(rg.prefixes_count));
+      const nh=el("input"); nh.value=rg.next_hop; nh.dataset.k="next_hop"; nh.placeholder="用目标组默认";
+      const cm=el("input"); cm.value=rg.community; cm.dataset.k="community"; cm.placeholder="用目标组默认";
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveRouteGroup(rg.id);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteRouteGroup(rg.id);};
+      [ch,nm,ct,nh,cm,sv,dl].forEach(function(c){r.appendChild(c);});
+      box.appendChild(r);
+    });
+    fillGroupSelects();
+  }
+  function saveRouteGroup(id){post("/api/routegroups",{action:"update",...readRow(id,"rg")}).then(loadStatus);}
+  function deleteRouteGroup(id){post("/api/routegroups",{action:"delete",id:id}).then(loadStatus);}
+
+  // ---------- 添加表单 ----------
+  function addSource(){
+    post("/api/sources",{action:"add",name:$("addSrcName").value.trim(),url:$("addSrcUrl").value.trim(),
+      interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked})
+      .then(function(){["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;loadStatus();});
+  }
+  function composeGrpName(){
+    $("addGrpName").value=($("addGrpCust").value.trim()+$("addGrpSite").value.trim()+$("addGrpLine").value.trim());
+  }
+  ["addGrpCust","addGrpSite","addGrpLine"].forEach(function(i){$(i).oninput=composeGrpName;});
+  function addGroup(){
+    post("/api/groups",{action:"add",name:$("addGrpName").value.trim()||("组"+Date.now()%1000),
+      neighbors:$("addGrpNeighbors").value.trim(),next_hop:$("addGrpNh").value.trim(),community:$("addGrpComm").value.trim()})
+      .then(function(){["addGrpCust","addGrpSite","addGrpLine","addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
+  }
+  function addRouteGroup(){
+    const body={action:"add",name:$("addRgName").value.trim(),url:$("addRgUrl").value.trim(),
+      prefixes:$("addRgPrefixes").value.trim(),next_hop:$("addRgNh").value.trim(),community:$("addRgComm").value.trim()};
+    post("/api/routegroups",body)
+      .then(function(){["addRgName","addRgUrl","addRgPrefixes","addRgNh","addRgComm"].forEach(function(i){$(i).value="";});loadStatus();});
+  }
+
+  // ---------- 通用 ----------
+  function post(url,data){
+    return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+      .then(function(r){return r.json();})
+      .then(function(j){if(j.status!=="ok"){appendLog("❌ API 错误: "+(j.msg||"未知错误"));throw new Error(j.msg);}return j;})
+      .catch(function(e){appendLog("❌ 请求失败: "+e.message);});
+  }
+
+  function loadStatus(){
+    fetch("/api/status").then(function(r){return r.json();}).then(function(d){
+      SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
+      renderKpi(d);
+      if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+    }).catch(function(){});
+  }
+
+  // ---------- 手动发布/撤回 ----------
+  function manual(act){
+    const routes=$("manualRoutes").value.split("\n").map(function(s){return s.trim();}).filter(Boolean);
+    if(!routes.length){appendLog("⚠️ 请先输入路由前缀");return;}
+    const body={group:$("grpSel").value,routes:routes};
+    const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
+    post(url,body).then(function(j){appendLog("✅ 手动"+ (act==="announce"?"发布":"撤回") +" "+j.count+" 条完成");});
+  }
+
+  // ---------- 路由组发布/撤回 ----------
+  function checkedRouteGroupIds(){
+    return Array.prototype.map.call(document.querySelectorAll(".rg-chk:checked"),function(c){return c.dataset.id;});
+  }
+  function rgOps(act){
+    const ids=checkedRouteGroupIds();
+    if(!ids.length){appendLog("⚠️ 请先勾选要"+(act==="announce"?"发布":"撤回")+"的路由组");return;}
+    const body={group:$("rgTarget").value,route_groups:ids};
+    const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
+    post(url,body).then(function(j){appendLog("✅ 路由组"+(act==="announce"?"发布":"撤回")+" "+ids.length+" 组 / "+j.count+" 条完成");});
+  }
+  $("btnRgAnnounce").onclick=function(){rgOps("announce");};
+  $("btnRgWithdraw").onclick=function(){rgOps("withdraw");};
+
+  $("btnAnnounce").onclick=function(){manual("announce");};
+  $("btnWithdraw").onclick=function(){manual("withdraw");};
+  $("btnRefresh").onclick=function(){post("/refresh",{}).then(function(){appendLog("⚡ 已触发全部数据源立即刷新");});};
+  $("btnAddSrc").onclick=addSource;
+  $("btnAddGrp").onclick=addGroup;
+  $("btnAddRg").onclick=addRouteGroup;
+  $("btnClear").onclick=function(){logBox.innerHTML="";};
+
+  // ---------- SSE ----------
+  const dot=$("sseDot"), txt=$("sseTxt");
+  const es=new EventSource("/api/logs");
+  es.onopen=function(){dot.className="dot";txt.textContent="SSE 已连接";};
+  es.onerror=function(){dot.className="dot off";txt.textContent="SSE 断开，重连中…";};
+  es.onmessage=function(ev){
+    let d; try{d=JSON.parse(ev.data);}catch(e){return;}
+    if(d.type==="log"){appendLog(d.message);}
+    else if(d.type==="status"){
+      renderKpi(d);
+      SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
+      if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+    }
+  };
+
+  loadStatus();
+  setInterval(loadStatus,10000);   // 轮询兜底
+})();
+</script>
+</body>
+</html>

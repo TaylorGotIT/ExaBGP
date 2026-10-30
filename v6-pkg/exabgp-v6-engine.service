@@ -1,0 +1,16 @@
+[Unit]
+Description=ExaBGP v6 Engine (REST API / SSE / conf generator / scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/exabgp
+Environment=INSTALL_DIR=/exabgp
+Environment=EXABGP_PID_FILE=/run/exabgp/exabgp.pid
+ExecStart=/exabgp/venv/bin/python /exabgp/http_api.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
