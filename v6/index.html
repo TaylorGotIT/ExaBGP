@@ -41,20 +41,25 @@
   textarea{font-family:Consolas,monospace;resize:vertical}
   label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
   .row{display:grid;gap:4px;align-items:center;margin-bottom:6px}
-  .row.src{grid-template-columns:110px 260px 90px 80px minmax(0,1fr) auto auto auto}
+  .row.src{grid-template-columns:110px 260px 90px 80px 240px auto auto auto}
   .row.src .status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .row.src input:not([type=checkbox]),.formline.addsrc input:not([type=checkbox]){width:100%;box-sizing:border-box}
-  .row.src input[type=number],.formline.addsrc input[type=number]{text-align:right}
+  .row.src input[type=number],.formline.addsrc input[type=number]{text-align:center}
+  .src-head > :nth-child(n+3){text-align:center}
+  .row.src > :nth-child(n+3){text-align:center}
+  .formline.addsrc > :nth-child(n+3){text-align:center}
+  .row.grp > :nth-child(n+3){text-align:center}
+  .formline.addgrp > :nth-child(n+3){text-align:center}
   .row.src .chk,.formline.addsrc .chk{margin:0 auto}
-  .src-head{display:grid;grid-template-columns:110px 260px 90px 80px minmax(0,1fr) auto;gap:4px;padding:5px 0 3px;font-size:12px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px}
+  .src-head{display:grid;grid-template-columns:110px 260px 90px 80px 240px auto;gap:4px;padding:5px 0 3px;font-size:12px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);margin-bottom:4px}
   .row.grp{grid-template-columns:100px 300px 120px 120px 46px 62px 62px}
   .row.rg{grid-template-columns:34px 110px 52px minmax(0,1fr) minmax(0,1fr) auto auto auto}
   .row .meta{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .row .num{text-align:center;font-weight:600;font-size:12px}
   .chk{width:16px;height:16px;accent-color:var(--accent);justify-self:center}
   .formline{display:grid;gap:8px;margin-top:8px}
-  .formline.addsrc{grid-template-columns:110px 260px 90px 80px minmax(0,1fr) auto;align-items:center}
-  .formline.addgrp{grid-template-columns:100px 300px 120px 120px 110px}
+  .formline.addsrc{grid-template-columns:110px 260px 90px 80px 240px auto;gap:4px;align-items:center}
+  .formline.addgrp{grid-template-columns:100px 300px 120px 120px 110px;gap:4px}
   .formline input:not([type=checkbox]),.formline select,.formline textarea,.row.grp input:not([type=checkbox]){width:100%;box-sizing:border-box}
   .formline.addrg{grid-template-columns:130px 400px 150px 150px}
   #addRgPrefixes{width:100%;max-width:560px}
@@ -106,7 +111,7 @@
   .rg-prow{display:grid;grid-template-columns:minmax(0,1fr) 44px auto;gap:6px;padding:3px 8px;border-bottom:1px solid #1c2a4a;align-items:center}
   .rg-prow .p{font-family:Consolas,monospace;font-size:12.5px;color:var(--green)}
   ::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:#2a3a5e;border-radius:4px}
-  @media (max-width:960px){ .grid2,.grid3{grid-template-columns:1fr} .cards{grid-template-columns:repeat(2,1fr)} .row.src{grid-template-columns:110px 260px 90px 80px auto auto auto auto} .formline.addsrc,.src-head{grid-template-columns:110px 260px 90px 80px auto auto} }
+  @media (max-width:960px){ .grid2,.grid3{grid-template-columns:1fr} .cards{grid-template-columns:repeat(2,1fr)} .row.src{grid-template-columns:110px 260px 90px 80px 240px auto auto auto} .formline.addsrc,.src-head{grid-template-columns:110px 260px 90px 80px 240px auto} }
 </style>
 </head>
 <body>
