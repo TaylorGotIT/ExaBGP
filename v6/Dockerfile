@@ -15,7 +15,6 @@ WORKDIR /exabgp
 # 引擎 + 前端 + conf 生成器 + 启动入口
 COPY confgen.py /exabgp/confgen.py
 COPY http_api.py /exabgp/http_api.py
-COPY healthcheck.py /exabgp/healthcheck.py
 COPY index.html /exabgp/index.html
 COPY entrypoint.sh /exabgp/entrypoint.sh
 # exabgp 内部选项（text 编码 FIFO API、前台运行、INFO 日志）

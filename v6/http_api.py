@@ -1106,7 +1106,7 @@ class ConfApiHandler(tornado.web.RequestHandler):
         self.write(text)
 
 class ControlHandler(tornado.web.RequestHandler):
-    """运行时控制：show adj-rib-out / show route / show neighbor / teardown / announce_route / withdraw_route"""
+    """运行时控制：向 exabgp 下发 show adj-rib-out / show route / show neighbor / teardown 命令"""
     async def post(self):
         try:
             data = json.loads(self.request.body)
@@ -1118,27 +1118,8 @@ class ControlHandler(tornado.web.RequestHandler):
                 "show_neighbor": "show neighbor summary",
                 "teardown": "teardown",
             }
-            if action in ("announce_route", "withdraw_route"):
-                # Nginx/服务联动：healthcheck.py 检测到服务 UP/DOWN 时发布/撤出指定前缀
-                if not ip:
-                    raise ValueError("请指定邻居 IP")
-                route = str(data.get("route", "")).strip()
-                if not route:
-                    raise ValueError("请指定要发布/撤回的路由前缀（route 字段，如 100.10.0.100/32）")
-                cmd = f"neighbor {ip} {action[:8]} route {route}"
-                nh = str(data.get("next_hop", "")).strip()
-                if nh:
-                    cmd += f" next-hop {nh}"
-                comm = str(data.get("community", "")).strip()
-                if comm:
-                    cmd += f" community {comm}"
-                cmds = [cmd + "\n"]
-                await asyncio.to_thread(write_to_pipe, cmds)
-                log(f"🚦 服务联动 {'发布' if action == 'announce_route' else '撤出'}: {route} @ {ip}{(' 下一跳 ' + nh) if nh else ''}{(' 属性 ' + comm) if comm else ''}")
-                self.write({"status": "ok", "sent": cmd})
-                return
             if action not in verbs:
-                raise ValueError(f"未知 action: {action}（支持 show_adj_rib_out / show_route / show_neighbor / teardown / announce_route / withdraw_route）")
+                raise ValueError(f"未知 action: {action}（支持 show_adj_rib_out / show_route / show_neighbor / teardown）")
             if action == "teardown" and not ip:
                 cmds = ["teardown all\n"]
             elif action in ("show_neighbor", "show_adj_rib_out", "show_route"):
