@@ -44,6 +44,10 @@ LOG_MAX_BYTES = int(os.environ.get("LOG_MAX_BYTES", str(5 * 1024 * 1024)))   # �
 LOG_RETENTION_DAYS = int(os.environ.get("LOG_RETENTION_DAYS", "7"))          # 留存天数（默认 7 天）
 _LAST_LOG_DATE = ""                                                    # 跨天检测用
 
+# ============ 邻居监控（轮询频率可配，默认 30s，范围 5~3600s） ============
+NEIGHBOR_POLL_INTERVAL = int(os.environ.get("NEIGHBOR_POLL_INTERVAL", "30"))
+NEIGHBOR_NEXT_POLL = 0.0                                               # 距下次轮询的时间戳（首次即轮询）
+
 # ============ SSE 实时日志广播中心 ============
 LOG_HISTORY = deque(maxlen=500)   # 历史日志环形缓冲（新客户端接入先补发；元素: {t, tag, text}）
 SSE_CLIENTS = set()               # 活跃 SSE 客户端队列集合
@@ -461,13 +465,25 @@ def demo_simulate_responses(commands):
                 if m:
                     for g in selected_groups():
                         for ip in g["neighbors"]:
-                            for p in sorted(union_routes())[:5]:
+                            for p in sorted(union_routes()):
                                 f.write(f"{ip} ipv4 unicast {p}\n")
                     continue
     except Exception:
         pass
 
 def write_to_pipe(commands):
+    # show adj-rib out 是一次全量快照：下发前重置对应邻居的发布列表，避免旧条目残留导致查询误报
+    for cmd in commands:
+        m = re.match(r"^(?:neighbor (\S+) )?show adj-rib out", cmd)
+        if m:
+            ip = m.group(1)
+            if ip:
+                st = NEIGHBOR_STATES.get(ip)
+                if st:
+                    st["adj_rib_out"] = []
+            else:
+                for st in NEIGHBOR_STATES.values():
+                    st["adj_rib_out"] = []
     with open(EXABGP_IN, "w") as f:
         for cmd in commands:
             f.write(cmd)
@@ -616,12 +632,16 @@ async def _refresh_all_coro():
             await source_refresh_job(sid)
 
 def scheduler_tick():
-    """每 TICK 检查各源是否到期，到期则调度刷新（支持运行时增减源）；并做日志跨天清理"""
+    """每 TICK 检查各源是否到期，到期则调度刷新（支持运行时增减源）；并做日志跨天清理与邻居状态轮询"""
     now = time.time()
     for sid, s in SOURCES.items():
         if s["enabled"] and now >= s["next_due"]:
             tornado.ioloop.IOLoop.current().add_callback(source_refresh_job, sid)
     check_log_rotation()
+    global NEIGHBOR_NEXT_POLL
+    if now >= NEIGHBOR_NEXT_POLL:
+        NEIGHBOR_NEXT_POLL = now + NEIGHBOR_POLL_INTERVAL
+        tornado.ioloop.IOLoop.current().add_callback(poll_neighbor_states)
 
 # ============ 启动自愈 ============
 async def announce_union_to_groups(only_id=None):
@@ -1094,23 +1114,23 @@ class ControlHandler(tornado.web.RequestHandler):
             ip = str(data.get("neighbor", "")).strip()
             verbs = {
                 "show_adj_rib_out": "show adj-rib out",
-                "show_route": "show route",
+                "show_route": "show adj-rib out",   # exabgp 4.x 无 show route，等价映射为查看已发布路由
                 "show_neighbor": "show neighbor summary",
                 "teardown": "teardown",
             }
             if action not in verbs:
                 raise ValueError(f"未知 action: {action}（支持 show_adj_rib_out / show_route / show_neighbor / teardown）")
-            if action == "show_route":
-                raise ValueError("exabgp 4.x 不支持 show route 命令，请改用 show adj-rib out 查看已发布路由")
             if action == "teardown" and not ip:
                 cmds = ["teardown all\n"]
-            elif action in ("show_neighbor", "show_adj_rib_out"):
+            elif action in ("show_neighbor", "show_adj_rib_out", "show_route"):
                 # 4.2.11：show 类命令不带 neighbor 前缀（带前缀会丢弃子命令，实测 exabgpcli 无前缀正常）
                 cmds = [f"{verbs[action]}\n"]
             else:
                 if not ip:
                     raise ValueError("请指定邻居 IP")
                 cmds = [f"neighbor {ip} {verbs[action]}\n"]
+            if action == "show_route":
+                log("ℹ️ show route 在 exabgp 4.x 不存在，已按等价命令 show adj-rib out 执行（查看已发布路由）")
             await asyncio.to_thread(write_to_pipe, cmds)
             log(f"⌨️ 运行时命令: {cmds[0].strip()}")
             self.write({"status": "ok", "sent": cmds[0].strip()})
@@ -1138,6 +1158,42 @@ class ResponsesHandler(tornado.web.RequestHandler):
     """运行时命令响应回显（最新在前，最多 200 条）"""
     async def get(self):
         self.write({"status": "ok", "responses": list(reversed(list(RESPONSES)))})
+
+class MonitorConfigHandler(tornado.web.RequestHandler):
+    """邻居监控轮询频率（默认 30s，可运行时修改，范围 5~3600s）"""
+    async def get(self):
+        self.write({"status": "ok", "interval": NEIGHBOR_POLL_INTERVAL})
+    async def post(self):
+        try:
+            data = json.loads(self.request.body)
+            v = int(data.get("interval", 0))
+            if v < 5 or v > 3600:
+                raise ValueError("轮询间隔须在 5~3600 秒之间")
+            global NEIGHBOR_POLL_INTERVAL, NEIGHBOR_NEXT_POLL
+            NEIGHBOR_POLL_INTERVAL = v
+            NEIGHBOR_NEXT_POLL = time.time() + v
+            log(f"📡 邻居监控轮询间隔已改为 {v}s")
+            self.write({"status": "ok", "interval": NEIGHBOR_POLL_INTERVAL})
+        except Exception as e:
+            self.set_status(500)
+            self.write({"status": "error", "msg": str(e)})
+
+class AdjRibHandler(tornado.web.RequestHandler):
+    """指定前缀是否在邻居已发布列表（show adj-rib out 全量快照中精确匹配）"""
+    async def get(self):
+        try:
+            ip = self.get_query_argument("ip", "").strip()
+            prefix = self.get_query_argument("prefix", "").strip()
+            if not ip or not prefix:
+                raise ValueError("需要 ip 与 prefix 参数，例如 /api/adjrib?ip=192.168.75.241&prefix=8.221.128.0/20")
+            st = NEIGHBOR_STATES.get(ip, {})
+            rib = st.get("adj_rib_out", [])
+            found = prefix in rib
+            log(f"🔍 前缀查询: {prefix} @ {ip} → {'已发布' if found else '未发布'}（发布列表 {len(rib)} 条）")
+            self.write({"status": "ok", "ip": ip, "prefix": prefix, "found": found, "count": len(rib)})
+        except Exception as e:
+            self.set_status(500)
+            self.write({"status": "error", "msg": str(e)})
 
 class HealthHandler(tornado.web.RequestHandler):
     async def get(self):
@@ -1189,6 +1245,8 @@ def make_app():
         (r"/api/control", ControlHandler),
         (r"/api/neighbors", NeighborsHandler),
         (r"/api/responses", ResponsesHandler),
+        (r"/api/monitor_config", MonitorConfigHandler),
+        (r"/api/adjrib", AdjRibHandler),
         (r"/health", HealthHandler),
         (r"/bulk/announce", BulkAnnounceHandler),
         (r"/bulk/withdraw", BulkWithdrawHandler),
@@ -1225,10 +1283,9 @@ async def run_server():
     tornado.ioloop.PeriodicCallback(scheduler_tick, cfg["TICK_SECONDS"] * 1000).start()
 
     # 监控联动：读线程监听 exabgp.out 响应；API 程序通道（stdin）接收 neighbor-changes 事件；
-    # 演示模式模拟 up 事件（10s），服务器模式事件驱动
+    # 演示模式模拟 up 事件（10s），服务器模式事件驱动；邻居状态轮询由 scheduler_tick 按 NEIGHBOR_POLL_INTERVAL 驱动
     threading.Thread(target=read_output_thread, daemon=True).start()
     threading.Thread(target=read_api_stdin_thread, daemon=True).start()
-    tornado.ioloop.PeriodicCallback(poll_neighbor_states, 10_000).start()
 
     await asyncio.Event().wait()
 
