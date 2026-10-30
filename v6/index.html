@@ -125,7 +125,7 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
-    <h2>实时日志 <span class="hint">（默认收起；点击邻居行的「日志」查看对应日志）</span>
+    <h2>实时日志 <span class="hint">（SSE 推送，分组折叠；默认收起，点「展开日志」查看）</span>
       <button id="btnLogToggle" class="sm" style="margin-left:8px">展开日志</button>
       <button id="btnLogAll" class="sm" style="display:none">全部日志</button>
     </h2>
@@ -174,13 +174,12 @@
   </div>
 
   <div class="panel">
-    <h2>分组邻居传播 <span class="hint">（组名=客户ID+站点号+线路序号）</span></h2>
+    <h2>分组邻居传播 <span class="hint">（组名=客户ID+站点号）</span></h2>
     <div id="grpList"></div>
     <div class="formline addgrp1" style="margin-top:10px">
       <div><div class="mini-label">客户ID *</div><input id="addGrpCust" placeholder="60001"></div>
       <div><div class="mini-label">站点号 *</div><input id="addGrpSite" placeholder="A"></div>
-      <div><div class="mini-label">线路序号 *</div><input id="addGrpLine" placeholder="1"></div>
-      <div><div class="mini-label">组名（自动拼接）</div><input id="addGrpName" placeholder="60001A1"></div>
+      <div><div class="mini-label">组名（自动拼接）</div><input id="addGrpName" placeholder="60001A"></div>
       <div style="align-self:end"><button id="btnAddGrp" class="primary">添加组</button></div>
     </div>
     <div class="formline addgrp2">
@@ -321,20 +320,6 @@
     if(LOG_FILTER&&!logBox.children.length){
       logBox.appendChild(el("div","ln more","（暂无 "+LOG_FILTER.ip+" 相关日志，可点「全部日志」查看所有）"));
     }
-  }
-  function showLogFor(ip){
-    const names=[ip];
-    GROUPS.forEach(function(g){
-      if((g.neighbors||[]).indexOf(ip)>=0&&names.indexOf(g.name)<0)names.push(g.name);
-    });
-    LOG_FILTER={ip:ip,names:names};
-    LOG_VISIBLE=true;
-    $("logBody").style.display="block";
-    $("btnLogToggle").textContent="收起日志";
-    $("btnLogAll").style.display="inline-block";
-    $("btnLogAll").textContent="全部日志（清除过滤）";
-    renderLogAll(false);
-    document.getElementById("logBody").scrollIntoView({behavior:"smooth",block:"start"});
   }
   function toggleLog(){
     LOG_VISIBLE=!LOG_VISIBLE;
@@ -490,13 +475,13 @@
       .then(function(){["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;loadStatus();});
   }
   function composeGrpName(){
-    $("addGrpName").value=($("addGrpCust").value.trim()+$("addGrpSite").value.trim()+$("addGrpLine").value.trim());
+    $("addGrpName").value=($("addGrpCust").value.trim()+$("addGrpSite").value.trim());
   }
-  ["addGrpCust","addGrpSite","addGrpLine"].forEach(function(i){$(i).oninput=composeGrpName;});
+  ["addGrpCust","addGrpSite"].forEach(function(i){$(i).oninput=composeGrpName;});
   function addGroup(){
     post("/api/groups",{action:"add",name:$("addGrpName").value.trim()||("组"+Date.now()%1000),
       neighbors:$("addGrpNeighbors").value.trim(),next_hop:$("addGrpNh").value.trim(),community:$("addGrpComm").value.trim()})
-      .then(function(){["addGrpCust","addGrpSite","addGrpLine","addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
+      .then(function(){["addGrpCust","addGrpSite","addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
   }
   function addRouteGroup(){
     const name=$("addRgName").value.trim();
@@ -622,9 +607,6 @@
     const rib=el("span","num",(st.rib_count||0)+" 条");
     const upd=el("span","num",(st.age||"-")+"s 前");
     const btns=el("div"); btns.style.cssText="display:flex;gap:4px;flex-wrap:wrap";
-    const lg=el("button","sm","日志"); lg.className="sm"; lg.title="查看该邻居相关日志";
-    lg.onclick=function(){showLogFor(ip);};
-    btns.appendChild(lg);
     [["adj-rib-out","show_adj_rib_out"],["show route","show_route"],["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
       const b=el("button","sm",pair[0]);
       if(pair[1]==="teardown")b.className="sm danger";
