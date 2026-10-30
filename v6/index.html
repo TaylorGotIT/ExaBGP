@@ -58,12 +58,13 @@
   .rgbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
   .rgbar select{width:280px}
   .lg-group{border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--panel2)}
-  .lg-head{display:flex;gap:8px;align-items:center;padding:6px 9px;font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none}
-  .lg-head:hover{background:var(--panel)}
+  .lg-head{display:flex;gap:8px;align-items:center;padding:6px 9px;font-size:12.5px;font-weight:700;color:var(--accent);user-select:none}
   .lg-head .cnt{color:var(--muted);font-weight:400}
-  .lg-head .toggle{margin-left:auto;color:var(--accent);font-weight:400;font-size:12px}
-  .lg-items{padding:2px 9px 7px}
-  .lg-items .ln.more{color:var(--muted);font-style:italic;padding-top:2px}
+  .lg-items{padding:2px 9px 7px;max-height:118px;overflow-y:auto}
+  .lg-items::-webkit-scrollbar{width:12px}
+  .lg-items::-webkit-scrollbar-track{background:var(--panel);border-radius:6px}
+  .lg-items::-webkit-scrollbar-thumb{background:#3a4b6e;border-radius:6px}
+  .lg-items::-webkit-scrollbar-thumb:hover{background:#4a5f8a}
   .lg-group .ln{padding:2px 0}
   .bulk-card{border:1px solid var(--border);border-radius:8px;background:var(--panel2);padding:7px 10px;font-size:12.5px}
   .bulk-card.ok{border-left:3px solid var(--green)}
@@ -246,7 +247,6 @@
   const LOG_TAGS=["announce","withdraw","source","group","routegroup","control","neighbor","conf","system"];
   const TAG_NAMES={announce:"📢 发布",withdraw:"🗑️ 撤回",source:"📡 数据源",group:"🧩 分组",routegroup:"📦 路由组",control:"⌨️ 命令",neighbor:"👁️ 邻居",conf:"⚙️ 配置",system:"🛠 系统"};
   const LOG_ITEMS=[];          // {tag,line,cls}，最新在尾部
-  const LOG_EXPANDED={};       // tag -> true/false 展开状态
   let LOG_VISIBLE=false;       // 日志面板默认收起
   let LOG_FILTER=null;         // {ip, names:[ip+所属组名]} 按邻居/组过滤日志
   let RESP_ALL=[];             // 命令响应（最新在前，后端最多 200 条）
@@ -295,20 +295,14 @@
     const head=el("div","lg-head");
     const t=el("span",null,TAG_NAMES[tag]||tag);
     const cnt=el("span","cnt"," "+items.length+" 条");
-    const btn=el("span","toggle",LOG_EXPANDED[tag]?"收起 ▲":"展开全部 ▼");
-    [t,cnt,btn].forEach(function(c){head.appendChild(c);});
-    head.onclick=function(){LOG_EXPANDED[tag]=!LOG_EXPANDED[tag];renderLogGroup(tag);};
+    [t,cnt].forEach(function(c){head.appendChild(c);});
     box.appendChild(head);
     const itemsBox=el("div","lg-items");
-    const shown=LOG_EXPANDED[tag]?items:items.slice(-3);
-    shown.forEach(function(it){
+    items.forEach(function(it){
       const d=el("div","ln "+it.cls);
       d.appendChild(document.createTextNode(it.line));
       itemsBox.appendChild(d);
     });
-    if(!LOG_EXPANDED[tag]&&items.length>3){
-      itemsBox.appendChild(el("div","ln more","… 共 "+items.length+" 条，点击组头「展开全部」查看"));
-    }
     box.appendChild(itemsBox);
     if(scrollBottom&&$("autoScroll").checked)logBox.scrollTop=logBox.scrollHeight;
   }
