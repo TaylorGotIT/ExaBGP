@@ -28,7 +28,7 @@
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
   .panel h2{font-size:14px;font-weight:700;margin-bottom:10px;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .panel h2 .hint{font-weight:400;font-size:12px;color:var(--muted)}
-  #log{height:420px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,'Courier New',monospace;font-size:12.5px;line-height:1.65}
+  #log{height:auto;max-height:420px;overflow-y:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,'Courier New',monospace;font-size:12.5px;line-height:1.65}
   .ln{white-space:pre-wrap;word-break:break-all}
   .ln .t{color:var(--muted)} .ln.ok{color:var(--green)} .ln.err{color:var(--red)} .ln.warn{color:var(--amber)} .ln.run{color:var(--sky)}
   .toolbar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
@@ -42,15 +42,16 @@
   label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
   .row{display:grid;gap:4px;align-items:center;margin-bottom:6px}
   .row.src{grid-template-columns:110px 260px 90px 80px auto auto auto auto}
-  .row.grp{grid-template-columns:100px minmax(0,1fr) 120px 120px 46px auto auto}
+  .row.src input[type=number],.formline.addsrc input[type=number]{text-align:right}
+  .row.src .chk,.formline.addsrc .chk{margin:0 auto}
+  .row.grp{grid-template-columns:100px 300px 120px 120px 46px auto auto}
   .row.rg{grid-template-columns:34px 110px 52px minmax(0,1fr) minmax(0,1fr) auto auto auto}
   .row .meta{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .row .num{text-align:center;font-weight:600;font-size:12px}
   .chk{width:16px;height:16px;accent-color:var(--accent);justify-self:center}
   .formline{display:grid;gap:8px;margin-top:8px}
   .formline.addsrc{grid-template-columns:110px 260px 90px 80px auto}
-  .formline.addgrp1{grid-template-columns:repeat(4,minmax(0,1fr)) auto}
-  .formline.addgrp2{grid-template-columns:minmax(0,1fr) 140px 140px}
+  .formline.addgrp{grid-template-columns:100px 300px 120px 120px auto}
   .formline.addrg{grid-template-columns:130px minmax(0,1fr) 150px 150px auto}
   .sec{margin-bottom:12px}
   .mini-label{font-size:11px;color:var(--muted);margin-bottom:2px}
@@ -174,18 +175,14 @@
   </div>
 
   <div class="panel" style="margin-top:16px">
-    <h2>分组邻居传播 <span class="hint">（组名=客户ID+站点号）</span></h2>
+    <h2>分组邻居传播 <span class="hint">（组名自定义；邻居 IP 逗号分隔多个）</span></h2>
     <div id="grpList"></div>
-    <div class="formline addgrp1" style="margin-top:10px">
-      <div><div class="mini-label">客户ID *</div><input id="addGrpCust" placeholder="60001"></div>
-      <div><div class="mini-label">站点号 *</div><input id="addGrpSite" placeholder="A"></div>
-      <div><div class="mini-label">组名（自动拼接）</div><input id="addGrpName" placeholder="60001A"></div>
-      <div style="align-self:end"><button id="btnAddGrp" class="primary">添加组</button></div>
-    </div>
-    <div class="formline addgrp2">
+    <div class="formline addgrp" style="margin-top:10px">
+      <div><div class="mini-label">组名 *</div><input id="addGrpName" placeholder="60001A"></div>
       <div><div class="mini-label">邻居 IP *（逗号分隔多个）</div><input id="addGrpNeighbors" placeholder="192.168.75.242,192.168.75.243"></div>
       <div><div class="mini-label">下一跳 *</div><input id="addGrpNh" placeholder="10.255.0.1"></div>
       <div><div class="mini-label">属性 community</div><input id="addGrpComm" placeholder="65000:200"></div>
+      <div style="align-self:end"><button id="btnAddGrp" class="primary">添加组</button></div>
     </div>
   </div>
 
@@ -468,14 +465,12 @@
       interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked})
       .then(function(){["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;loadStatus();});
   }
-  function composeGrpName(){
-    $("addGrpName").value=($("addGrpCust").value.trim()+$("addGrpSite").value.trim());
-  }
-  ["addGrpCust","addGrpSite"].forEach(function(i){$(i).oninput=composeGrpName;});
   function addGroup(){
-    post("/api/groups",{action:"add",name:$("addGrpName").value.trim()||("组"+Date.now()%1000),
+    const name=$("addGrpName").value.trim();
+    if(!name){appendLog("❌ 添加失败：组名不能为空", "group");return;}
+    post("/api/groups",{action:"add",name:name,
       neighbors:$("addGrpNeighbors").value.trim(),next_hop:$("addGrpNh").value.trim(),community:$("addGrpComm").value.trim()})
-      .then(function(){["addGrpCust","addGrpSite","addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
+      .then(function(){["addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
   }
   function addRouteGroup(){
     const name=$("addRgName").value.trim();
