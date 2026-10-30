@@ -27,6 +27,10 @@ from collections import deque
 
 EXABGP_IN = "/run/exabgp/exabgp.in"
 EXABGP_OUT = "/run/exabgp/exabgp.out"   # exabgp 运行时命令响应通道（text encoder 返回）
+DEMO_MODE = EXABGP_IN.endswith(".cmd")  # 本地演示模式：无真实 exabgp 进程，由引擎模拟响应
+FSM_MAP = {"idle": "Idle", "connect": "Connect", "active": "Active", "opensent": "OpenSent",
+           "openconfirm": "OpenConfirm", "established": "Established", "closing": "Closing",
+           "down": "Down", "up": "Up"}
 PERSIST_DIR = "/exabgp/data"
 CONFIG_FILE = PERSIST_DIR + "/runtime_config.json"
 CONF_FILE = PERSIST_DIR + "/exabgp.conf"   # 按分组模板自动生成的 exabgp 配置
@@ -92,11 +96,22 @@ RESPONSES = deque(maxlen=200)        # exabgp.out 返回原文环形缓冲（前
 NEIGHBOR_STATES = {}                # ip -> {state, adj_rib_out:[..], updated}  邻居监控表
 
 def handle_output_line(line):
-    """解析 exabgp.out 返回行：邻居状态 / adj-rib-out / 原样记录"""
+    """解析 exabgp.out 返回行：邻居状态（show neighbor summary）/ adj-rib-out / 原样记录"""
     line = line.strip()
     if not line:
         return
     RESPONSES.append({"t": time.time(), "line": line})
+    # exabgp 4.x `show neighbor summary` 输出行：Peer  IP  AS  up/down  state  #sent  #recvd
+    m = re.match(r"^(\d+\.\d+\.\d+\.\d+)\s+\S+\s+\S+\s+([A-Za-z]+)\s+\d+\s+\d+\s*$", line)
+    if m:
+        ip, st = m.group(1), FSM_MAP.get(m.group(2).lower(), m.group(2))
+        old = NEIGHBOR_STATES.get(ip, {}).get("state")
+        st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
+        st0["state"] = st
+        st0["updated"] = time.time()
+        if old and old != st:
+            log(f"🔔 邻居 {ip}: {old} → {st}")
+        return
     m = re.match(r"^neighbor (\S+) (Established|Idle|Active|Connect|OpenSent|OpenConfirm|Down)\s*$", line)
     if m:
         ip, st = m.group(1), m.group(2)
@@ -106,6 +121,15 @@ def handle_output_line(line):
         st0["updated"] = time.time()
         if old and old != st:
             log(f"🔔 邻居 {ip}: {old} → {st}")
+        return
+    # exabgp `show adj-rib out` text 输出行：<ip> ipv4 unicast <prefix>
+    m = re.match(r"^(\d+\.\d+\.\d+\.\d+)\s+(?:ipv4|ipv6) unicast\s+(\S+)\s*$", line)
+    if m:
+        ip, p = m.group(1), m.group(2)
+        st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
+        if p not in st0["adj_rib_out"]:
+            st0["adj_rib_out"].append(p)
+        st0["updated"] = time.time()
         return
     m = re.match(r"^neighbor (\S+) adj-rib-out (\S+)(\s+.*)?$", line)
     if m:
@@ -135,12 +159,12 @@ def read_output_thread():
             time.sleep(1.0)
 
 def poll_neighbor_states():
-    """监控联动：每轮询周期向 exabgp 发 show neighbor，刷新邻居状态表（配合读线程解析）"""
+    """监控联动：每轮询周期向 exabgp 发 show neighbor summary，刷新邻居状态表（配合读线程解析）"""
     sent = 0
     for g in selected_groups():
         for n in g["neighbors"]:
             try:
-                write_to_pipe([f"neighbor {n} show neighbor\n"])
+                write_to_pipe([f"neighbor {n} show neighbor summary\n"])
                 sent += 1
             except Exception:
                 pass
@@ -342,10 +366,30 @@ def regenerate_conf(reason="", notify=True):
         log(f"❌ exabgp.conf 重生成失败: {e}")
 
 # ============ 管道写入（按组/邻居分批） ============
+def demo_simulate_responses(commands):
+    """演示模式（无真实 exabgp 进程）模拟响应写入 out 通道，供监控联动演示"""
+    try:
+        with open(EXABGP_OUT, "a", encoding="utf-8") as f:
+            for cmd in commands:
+                m = re.match(r"^neighbor (\S+) show neighbor summary", cmd)
+                if m:
+                    ip = m.group(1)
+                    f.write(f"{ip:<15} 65001      0:01:29 established          0          0\n")
+                    continue
+                m = re.match(r"^neighbor (\S+) show adj-rib out", cmd)
+                if m:
+                    for p in sorted(union_routes())[:5]:
+                        f.write(f"{m.group(1)} ipv4 unicast {p}\n")
+                    continue
+    except Exception:
+        pass
+
 def write_to_pipe(commands):
     with open(EXABGP_IN, "w") as f:
         for cmd in commands:
             f.write(cmd)
+    if DEMO_MODE:
+        demo_simulate_responses(commands)
 
 def selected_groups(only_id=None):
     """要下发的组列表：默认所有启用组；only_id 指定时只看该组（无视启用状态，用于删除/停用回撤）"""
@@ -965,13 +1009,15 @@ class ControlHandler(tornado.web.RequestHandler):
             action = data.get("action", "")
             ip = str(data.get("neighbor", "")).strip()
             verbs = {
-                "show_adj_rib_out": "show adj-rib-out",
+                "show_adj_rib_out": "show adj-rib out",
                 "show_route": "show route",
-                "show_neighbor": "show neighbor",
+                "show_neighbor": "show neighbor summary",
                 "teardown": "teardown",
             }
             if action not in verbs:
                 raise ValueError(f"未知 action: {action}（支持 show_adj_rib_out / show_route / show_neighbor / teardown）")
+            if action == "show_route":
+                raise ValueError("exabgp 4.x 不支持 show route 命令，请改用 show adj-rib out 查看已发布路由")
             if action == "teardown" and not ip:
                 cmds = ["teardown all\n"]
             else:
