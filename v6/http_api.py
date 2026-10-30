@@ -87,8 +87,8 @@ def sse_broadcast_status():
     sse_broadcast(status_payload())
 
 def log(msg):
-    text = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [Internal-Scheduler] {msg}"
-    item = {"t": time.time(), "tag": infer_tag(msg), "text": text}
+    text = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
+    item = {"t": time.time(), "tag": infer_tag(msg), "text": text, "msg": msg}
     print(text, file=sys.stderr)
     LOG_HISTORY.append(item)
     _write_disk_log(item)
@@ -105,7 +105,7 @@ def _write_disk_log(item):
                 return
         except OSError:
             pass
-        line = "{} [{}] {}\n".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["t"])), item["tag"], item["text"])
+        line = "{} [{}] {}\n".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["t"])), item["tag"], item["msg"])
         with open(path, "a", encoding="utf-8") as f:
             f.write(line)
     except Exception:

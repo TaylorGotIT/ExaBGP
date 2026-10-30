@@ -284,14 +284,14 @@
     return box;
   }
   function renderLogGroup(tag,scrollBottom){
-    const box=groupBox(tag);
-    box.innerHTML="";
     const items=LOG_ITEMS.filter(function(it){
       if(it.tag!==tag)return false;
       if(!LOG_FILTER)return true;
       return LOG_FILTER.names.some(function(n){return it.line.indexOf(n)>=0;});
     });
     if(!items.length)return;
+    const box=groupBox(tag);
+    box.innerHTML="";
     const head=el("div","lg-head");
     const t=el("span",null,TAG_NAMES[tag]||tag);
     const cnt=el("span","cnt"," "+items.length+" 条");
