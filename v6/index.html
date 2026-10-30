@@ -201,7 +201,7 @@
       <div><div class="mini-label">属性（可选覆盖）</div><input id="addRgComm" placeholder="65000:777"></div>
       <div style="align-self:end"><button id="btnAddRg" class="primary">添加路由组</button></div>
     </div>
-    <div class="mini-label" style="margin-top:8px">前缀列表（手动粘贴，必填；每行一个，可一次贴多条，如 13.107.6.0/24）</div>
+    <div class="mini-label" style="margin-top:8px">前缀列表 *（手动粘贴，必填；每行一个，可一次贴多条，如 13.107.6.0/24）</div>
     <textarea id="addRgPrefixes" rows="3" placeholder="13.107.6.0/24&#10;52.96.0.0/14&#10;10.1.1.1/32"></textarea>
   </div>
 
@@ -441,8 +441,12 @@
       .then(function(){["addGrpCust","addGrpSite","addGrpLine","addGrpName","addGrpNeighbors","addGrpNh","addGrpComm"].forEach(function(i){$(i).value="";});loadStatus();});
   }
   function addRouteGroup(){
-    const body={action:"add",name:$("addRgName").value.trim(),
-      prefixes:$("addRgPrefixes").value.trim(),next_hop:$("addRgNh").value.trim(),community:$("addRgComm").value.trim()};
+    const name=$("addRgName").value.trim();
+    const prefixes=$("addRgPrefixes").value.trim();
+    if(!name){appendLog("❌ 添加失败：名称不能为空", "routegroup");return;}
+    if(!prefixes){appendLog("❌ 添加失败：前缀列表不能为空（请手动粘贴至少一条前缀）", "routegroup");return;}
+    const body={action:"add",name:name,prefixes:prefixes,
+      next_hop:$("addRgNh").value.trim(),community:$("addRgComm").value.trim()};
     post("/api/routegroups",body)
       .then(function(){["addRgName","addRgPrefixes","addRgNh","addRgComm"].forEach(function(i){$(i).value="";});loadStatus();});
   }
