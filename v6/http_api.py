@@ -260,6 +260,7 @@ def get_runtime_config():
         "DATA_URL": os.environ.get("DATA_URL", "https://gaoyifan.github.io/china-operator-ip/china.txt"),
         "TARGET_NEIGHBOR": os.environ.get("TARGET_NEIGHBOR", "192.168.75.241"),
         "NEXT_HOP": os.environ.get("NEXT_HOP", "192.168.75.244"),
+        "LOCAL_AS": os.environ.get("LOCAL_AS", "65000"),
         "BATCH_SIZE": int(os.environ.get("BATCH_SIZE", "2000")),
         "ROUTE_COMMUNITY": os.environ.get("ROUTE_COMMUNITY", "65000:100"),
         "TICK_SECONDS": 5,
@@ -284,10 +285,12 @@ def status_payload():
     grps = [{
         "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
         "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
+        "med": g.get("med", ""), "prepend": g.get("prepend", 0),
     } for g in GROUPS.values()]
     rgs = [{
         "id": rg["id"], "name": rg["name"], "prefixes_count": len(rg["prefixes"]),
         "next_hop": rg["next_hop"], "community": rg["community"],
+        "med": rg.get("med", ""), "prepend": rg.get("prepend", 0),
     } for rg in ROUTE_GROUPS.values()]
     return {
         "type": "status",
@@ -313,12 +316,14 @@ def save_config():
             "groups": [{
                 "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
                 "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
+                "med": g.get("med", ""), "prepend": g.get("prepend", 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
             } for g in GROUPS.values()],
             "routegroups": [{
                 "id": rg["id"], "name": rg["name"],
                 "next_hop": rg["next_hop"], "community": rg["community"],
+                "med": rg.get("med", ""), "prepend": rg.get("prepend", 0),
             } for rg in ROUTE_GROUPS.values()],
         }
         with open(CONFIG_FILE, "w") as f:
@@ -347,6 +352,7 @@ def load_config():
                 "neighbors": list(g.get("neighbors", [])),
                 "next_hop": g.get("next_hop", ""), "community": g.get("community", ""),
                 "enabled": bool(g.get("enabled", True)),
+                "med": str(g.get("med", "") or ""), "prepend": int(g.get("prepend", 0) or 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
             }
@@ -355,6 +361,7 @@ def load_config():
                 "id": rg["id"], "name": rg.get("name", rg["id"]),
                 "prefixes": set(),
                 "next_hop": rg.get("next_hop", ""), "community": rg.get("community", ""),
+                "med": str(rg.get("med", "") or ""), "prepend": int(rg.get("prepend", 0) or 0),
             }
         # 恢复路由组前缀集合
         for rgid in list(ROUTE_GROUPS):
@@ -394,6 +401,7 @@ def bootstrap_defaults():
         "id": "g1", "name": "默认组",
         "neighbors": [cfg["TARGET_NEIGHBOR"]],
         "next_hop": cfg["NEXT_HOP"], "community": cfg["ROUTE_COMMUNITY"], "enabled": True,
+        "med": "", "prepend": 0,
     }
     save_config()
 
@@ -430,6 +438,49 @@ def validate_prefix(p):
     if net.version != 4:
         return None
     return str(net)
+
+# ============ 选路属性（MED / AS-PATH prepend） ============
+def normalize_med(v):
+    """MED：空 = 不携带该属性；否则 0~4294967295"""
+    s = str(v if v is not None else "").strip()
+    if not s:
+        return ""
+    if not s.isdigit() or int(s) > 4294967295:
+        raise ValueError(f"MED 非法: {s}（须为 0~4294967295 的整数，留空表示不携带 MED）")
+    return str(int(s))
+
+def normalize_prepend(v):
+    """AS-PATH prepend：重复本地 AS 的次数，0 = 不额外 prepend（空路径长度保持 1）"""
+    s = str(v if v is not None else "").strip()
+    if not s:
+        return 0
+    if not s.isdigit() or int(s) > 10:
+        raise ValueError(f"prepend 非法: {s}（须为 0~10 的整数，表示 AS-PATH 中重复本地 AS 的次数）")
+    return int(s)
+
+def announce_command(neighbor, prefix, next_hop, community, med=None, prepend=0, local_as=None):
+    """拼一条 announce 指令：next-hop 必带，as-path/med/community 按需附加。
+
+    exabgp 只有在该路由完全没有 AS-PATH 时才会自动补一个本地 AS（attributes.py 的 default 分支），
+    所以显式给出 as-path 时，路径里需要自己带上下本地 AS：
+        prepend=0 → 不带 as-path（由 exabgp 补 [local_as]，长度 1）
+        prepend=2 → as-path [local_as local_as local_as]（长度 3）
+    """
+    cmd = f"neighbor {neighbor} announce route {prefix} next-hop {next_hop}"
+    try:
+        n = int(prepend or 0)
+    except (TypeError, ValueError):
+        n = 0
+    if n > 0:
+        asn = str(local_as or os.environ.get("LOCAL_AS", "65000")).strip()
+        cmd += " as-path [ " + " ".join([asn] * (n + 1)) + " ]"
+    m = str(med if med is not None else "").strip()
+    if m:
+        cmd += f" med {m}"
+    c = str(community or "").strip()
+    if c:
+        cmd += f" community [{c}]"
+    return cmd + "\n"
 
 # ============ exabgp.conf 按分组模板自动生成 ============
 def regenerate_conf(reason="", notify=True):
@@ -512,7 +563,9 @@ async def write_announces(prefixes, only_id=None, batch_size=None):
     for g in selected_groups(only_id):
         for n in g["neighbors"]:
             for batch in batch_chunks(plist, B):
-                cmds = [f"neighbor {n} announce route {p} next-hop {g['next_hop']} community [{g['community']}]\n" for p in batch]
+                cmds = [announce_command(n, p, g["next_hop"], g.get("community", ""),
+                                        g.get("med", ""), g.get("prepend", 0), g.get("local_as"))
+                        for p in batch]
                 await asyncio.to_thread(write_to_pipe, cmds)
                 await asyncio.sleep(0.05)
 
@@ -670,7 +723,7 @@ async def announce_union_to_group(gid):
         return
     prefixes = union_routes()
     await write_announces(prefixes, only_id=gid)
-    log(f"📢 分组 [{g['name']}] 已启用，补发全库 {len(prefixes)} 条路由")
+    log(f"📢 分组 [{g['name']}] 已补发全库 {len(prefixes)} 条路由（重新启用或属性变更）")
     sse_broadcast_status()
 
 async def withdraw_all_from_group(gid):
@@ -687,6 +740,10 @@ async def withdraw_all_from_group(gid):
 # ============ HTTP 接口 ============
 class IndexHandler(tornado.web.RequestHandler):
     def get(self):
+        # 控制台页面随版本变化，禁止浏览器缓存（否则升级后仍显示旧界面）
+        self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.set_header("Pragma", "no-cache")
+        self.set_header("Expires", "0")
         self.render("index.html")
 
 class StatusApiHandler(tornado.web.RequestHandler):
@@ -785,6 +842,8 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                     "id": gid, "name": name, "neighbors": neighbors,
                     "next_hop": str(data.get("next_hop", "")).strip(),
                     "community": str(data.get("community", "")).strip(),
+                    "med": normalize_med(data.get("med")),
+                    "prepend": normalize_prepend(data.get("prepend")),
                     "enabled": bool(data.get("enabled", True)),
                     "local_as": str(data.get("local_as", "")).strip(),
                     "peer_as": str(data.get("peer_as", "")).strip(),
@@ -802,6 +861,8 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                 g = GROUPS.get(gid)
                 if not g:
                     raise ValueError(f"分组 {gid} 不存在")
+                old_attrs = (g["next_hop"], g["community"], g.get("med", ""), g.get("prepend", 0))
+                just_enabled = False
                 if "name" in data and str(data["name"]).strip():
                     g["name"] = str(data["name"]).strip()
                 if "neighbors" in data:
@@ -820,6 +881,10 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                     g["next_hop"] = v
                 if "community" in data:
                     g["community"] = str(data["community"]).strip()
+                if "med" in data:
+                    g["med"] = normalize_med(data["med"])
+                if "prepend" in data:
+                    g["prepend"] = normalize_prepend(data["prepend"])
                 for k in ("local_as", "peer_as"):
                     if k in data:
                         g[k] = str(data[k]).strip()
@@ -832,10 +897,17 @@ class GroupsApiHandler(tornado.web.RequestHandler):
                 if "enabled" in data and bool(data["enabled"]) != g["enabled"]:
                     if bool(data["enabled"]):
                         g["enabled"] = True
+                        just_enabled = True
                         ioloop.add_callback(announce_union_to_group, gid)
                     else:
                         g["enabled"] = False
                         ioloop.add_callback(withdraw_all_from_group, gid)
+                # 下一跳/community/MED/prepend 变更后，已下发的路由不会自动带上新属性，
+                # 需要对启用组重播一次全库（同前缀再 announce 即为属性更新）
+                new_attrs = (g["next_hop"], g["community"], g.get("med", ""), g.get("prepend", 0))
+                if not just_enabled and g["enabled"] and new_attrs != old_attrs:
+                    ioloop.add_callback(announce_union_to_group, gid)
+                    log(f"🔁 分组 [{g['name']}] 下发属性变更，正在按新属性重播全库路由")
                 save_config()
                 ioloop.add_callback(regenerate_conf, f"更新分组 {g['name']}")
                 log(f"✏️ 分组 [{g['name']}] 已更新")
@@ -888,6 +960,8 @@ class RouteGroupsApiHandler(tornado.web.RequestHandler):
                     "id": rgid, "name": name, "prefixes": prefixes,
                     "next_hop": str(data.get("next_hop", "")).strip(),
                     "community": str(data.get("community", "")).strip(),
+                    "med": normalize_med(data.get("med")),
+                    "prepend": normalize_prepend(data.get("prepend")),
                 }
                 save_routegroup_prefixes(rgid)
                 save_config()
@@ -904,6 +978,10 @@ class RouteGroupsApiHandler(tornado.web.RequestHandler):
                     rg["next_hop"] = str(data["next_hop"]).strip()
                 if "community" in data:
                     rg["community"] = str(data["community"]).strip()
+                if "med" in data:
+                    rg["med"] = normalize_med(data["med"])
+                if "prepend" in data:
+                    rg["prepend"] = normalize_prepend(data["prepend"])
                 changed = False
                 if "url" in data and str(data["url"]).strip():
                     try:
@@ -1020,8 +1098,10 @@ def expand_announce_items(data):
             continue
         nh = rg.get("next_hop") or None
         cm = rg.get("community") or None
+        med = rg.get("med") or None
+        prep = rg.get("prepend") or 0
         for p in sorted(rg["prefixes"]):
-            items.append({"route": p, "next_hop": nh, "community": cm})
+            items.append({"route": p, "next_hop": nh, "community": cm, "med": med, "prepend": prep})
     for it in data.get("routes") or []:
         if isinstance(it, str):
             items.append({"route": it, "next_hop": None, "community": None})
@@ -1049,16 +1129,17 @@ class BulkAnnounceHandler(tornado.web.RequestHandler):
             detail = []
             for g in resolve_targets(data):
                 gd = {"group": g["name"], "neighbors": g["neighbors"],
-                      "next_hop": g["next_hop"], "community": g["community"], "routes": []}
+                      "next_hop": g["next_hop"], "community": g["community"],
+                      "med": g.get("med", ""), "prepend": g.get("prepend", 0), "routes": []}
                 for n in g["neighbors"]:
                     for item in items:
                         nh = item.get("next_hop") or g["next_hop"]
-                        c = item.get("community") or g["community"]
-                        gd["routes"].append({"route": item["route"], "next_hop": nh, "community": c})
-                        base = f"neighbor {n} announce route {item['route']} next-hop {nh}"
-                        if c:
-                            base += f" community [{c}]"
-                        cmds.append(base + "\n")
+                        c = item.get("community") or g.get("community", "")
+                        m = item.get("med") if item.get("med") not in (None, "") else g.get("med", "")
+                        pr = item.get("prepend") or g.get("prepend", 0)
+                        gd["routes"].append({"route": item["route"], "next_hop": nh,
+                                             "community": c, "med": m, "prepend": pr})
+                        cmds.append(announce_command(n, item["route"], nh, c, m, pr, g.get("local_as")))
                 detail.append(gd)
             await asyncio.to_thread(write_to_pipe, cmds)
             sse_broadcast_status()
