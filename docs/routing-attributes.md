@@ -145,7 +145,51 @@ bgp 65001
 
 > 不同 VRP 版本命令略有差异（`ip community-filter` vs `ip community-filter basic`），以设备为准。
 
-## 7. 注意事项
+## 7. IPS 黑名单（RTBH 黑洞路由）
+
+入侵防御/威胁情报给的 IP 名单，不应该当"选路路由"发，而要走 **RTBH（Remote-Triggered Black Hole）**：把攻击目标的前缀**指向黑洞下一跳**并打上标准黑洞社区，CE 命中后丢弃。
+
+### 7.1 准备一个独立分组
+
+| 字段 | 值 |
+|---|---|
+| 组名 | `IPS-BLACKHOLE` |
+| 邻居 | CE（192.168.75.241） |
+| 下一跳 | **192.0.2.1**（RFC 6666 Discard Prefix，或 198.18.0.1 / 专用私网地址） |
+| 属性 community | `65535:666`（RFC 7999 BLACKHOLE） |
+| MED / Prepends | **留空**（黑洞路由不需要选路属性） |
+
+### 7.2 数据源绑定到该分组
+
+「数据源管理」里新增一行：URL 填 IPS 名单地址，间隔按需（默认 1 小时），**可见分组填 `IPS-BLACKHOLE`**。
+
+> `可见分组` 留空 = 发往全部组；填了就只发这些组。这是黑名单必须隔离的关键——否则黑名单会按正常分组的下一跳/属性播出去。
+
+### 7.3 CE（华为）侧配置
+
+```
+ip route-static 192.0.2.1 255.255.255.255 NULL0      # 让黑洞 next-hop "可达"
+
+ip community-filter basic CF-BH permit 65535:666
+route-policy RP-FROM-EXABGP permit node 5
+ if-match community-filter CF-BH
+ apply ip-address next-hop 192.0.2.1
+route-policy RP-FROM-EXABGP permit node 10
+ ...（正常的选路策略）
+bgp 65001
+ peer 192.168.75.244 route-policy RP-FROM-EXABGP import
+```
+
+策略节点顺序很关键：黑洞节点必须在正常策略**前面**。
+
+### 7.4 注意事项
+
+- **白名单/重叠**：黑名单 IP 若落在正常宣告的大段里，会把整个段黑洞掉；上线前先做重叠检查。
+- **名单规模与抖动**：几千条 /32 且高频变化会产生大量 UPDATE，建议对名单做去重、相邻前缀归并、变更限速。
+- **不要配 MED / prepend**：对"丢弃"没有意义，还会干扰正常选路。
+- 名单里裸 IP 会自动补 `/32`，无需手工加掩码。
+
+## 8. 注意事项
 
 1. **改属性要重播**：分组属性保存后引擎会自动对该组重播全库；路由组属性只在"发布选中路由组"时生效。
 2. **MED 只同 AS 比较**：两个不同 AS 的邻居发来的同前缀，MED 不参与比较（除非开启 `always-compare-med`）。
@@ -153,7 +197,7 @@ bgp 65001
 4. **不要用 LP**：见上文，eBGP 不传。
 5. **验证顺序**：先 `display bgp all summary` 确认数量，再查单条属性，最后才看选路结果。
 
-## 8. 排错
+## 9. 排错
 
 | 现象 | 可能原因 |
 |---|---|

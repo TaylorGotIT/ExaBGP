@@ -142,7 +142,11 @@ curl -X POST … -d '{"action":"refresh","id":"s1"}'
 curl -X POST … -d '{"action":"delete","id":"s1"}'
 ```
 
-字段：`name` / `url`（http(s) 直链）/ `interval`（≥10）/ `enabled`。`update` 时只传要改的字段。
+字段：`name` / `url`（http(s) 直链）/ `interval`（≥10）/ `enabled` / `groups`（分组名或 id，逗号分隔；**留空 = 全部启用组**）。`update` 时只传要改的字段。
+
+> `groups` 是"可见分组"绑定：绑定后该源的路由**只**发往这些分组，适合 IPS 黑名单这类必须独占下一跳/属性的路由。绑定变更会立即对旧组撤回、新组补发。
+>
+> URL 内容支持 CIDR 与**纯 IP**（自动补 `/32`），主机位会归一（`10.0.0.1/24` → `10.0.0.0/24`）。
 
 ---
 

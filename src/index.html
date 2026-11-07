@@ -316,10 +316,10 @@
     <div class="tbl-wrap">
       <table class="tbl">
         <colgroup>
-          <col style="width:12%"><col style="width:45%"><col style="width:7%"><col style="width:5%"><col style="width:15%"><col style="width:16%">
+          <col style="width:11%"><col style="width:34%"><col style="width:7%"><col style="width:5%"><col style="width:16%"><col style="width:13%"><col style="width:14%">
         </colgroup>
         <thead>
-          <tr><th data-table="src" data-sort="name">名称</th><th>URL</th><th class="num" data-table="src" data-sort="interval">间隔（秒）</th><th class="ctr">启用</th><th>状态</th><th class="act">操作</th></tr>
+          <tr><th data-table="src" data-sort="name">名称</th><th>URL</th><th class="num" data-table="src" data-sort="interval">间隔（秒）</th><th class="ctr">启用</th><th>可见分组</th><th>状态</th><th class="act">操作</th></tr>
         </thead>
         <tbody id="srcList"></tbody>
         <tfoot>
@@ -328,6 +328,7 @@
             <td><input id="addSrcUrl" placeholder="https://…/china.txt"></td>
             <td><input id="addSrcInterval" type="number" value="3600" min="10"></td>
             <td class="ctr"><input id="addSrcEnabled" type="checkbox" class="chk" checked></td>
+            <td><input id="addSrcGroups" placeholder="留空=全部组"></td>
             <td class="status-text">添加后立即进入调度</td>
             <td class="act"><button id="btnAddSrc" class="primary sm">添加源</button></td>
           </tr>
@@ -937,11 +938,11 @@
   // ---------- 数据源表 ----------
   function renderSources(){
     const body=$("srcList"); body.innerHTML="";
-    if(!SOURCES.length){body.appendChild(emptyRow(6,"暂无数据源，请在下方添加。"));return;}
+    if(!SOURCES.length){body.appendChild(emptyRow(7,"暂无数据源，请在下方添加。"));return;}
     const rows=applySort(
-      SOURCES.filter(function(s){return hitQ(s.name,s.url,s.last_status);}),
+      SOURCES.filter(function(s){return hitQ(s.name,s.url,s.last_status,(s.groups||[]).join(","));}),
       "src",{name:function(s){return s.name;},interval:function(s){return s.interval;}});
-    if(!rows.length){body.appendChild(emptyRow(6,"没有匹配「"+SEARCH+"」的数据源。"));return;}
+    if(!rows.length){body.appendChild(emptyRow(7,"没有匹配「"+SEARCH+"」的数据源。"));return;}
     rows.forEach(function(s){
       const tr=el("tr");
       const nm=el("input"); nm.value=s.name; nm.dataset.k="name"; nm.title=s.name;
@@ -950,18 +951,22 @@
       const iv=el("input"); iv.type="number"; iv.min="10"; iv.value=s.interval; iv.dataset.k="interval";
       const en=el("input"); en.type="checkbox"; en.checked=s.enabled; en.dataset.k="enabled"; en.className="chk";
       const st=el("div","status-text",s.last_status||"–"); st.title=(s.last_time||"")+" · 本源 "+(s.routes_count||0)+" 条";
+      const gnames=(s.groups||[]).map(function(gid){ return (GROUPS.filter(function(g){return g.id===gid;})[0]||{}).name||gid; });
+      const gs=el("input"); gs.value=gnames.join(","); gs.dataset.k="groups";
+      gs.placeholder="全部组"; gs.title=gnames.length?("仅发往："+gnames.join("、")):"发往全部启用分组";
 
       const c1=el("td"); c1.appendChild(nm);
       const c2=el("td"); c2.appendChild(ur);
       const c3=cell("num"); c3.appendChild(iv);
       const c4=cell("ctr"); c4.appendChild(en);
-      const c5=el("td"); c5.appendChild(st);
-      const c6=cell("act");
+      const c5=el("td"); c5.appendChild(gs);
+      const c6=el("td"); c6.appendChild(st);
+      const c7=cell("act");
       const sv=el("button","sm","保存"); sv.onclick=function(){saveSource(s,tr,sv);};
       const rf=el("button","sm","刷新"); rf.onclick=function(){refreshSource(s,rf);};
       const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteSource(s,dl);};
-      c6.appendChild(sv); c6.appendChild(rf); c6.appendChild(dl);
-      [c1,c2,c3,c4,c5,c6].forEach(function(c){tr.appendChild(c);});
+      c7.appendChild(sv); c7.appendChild(rf); c7.appendChild(dl);
+      [c1,c2,c3,c4,c5,c6,c7].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
     });
   }
@@ -1115,9 +1120,10 @@
   function addSource(){
     const name=$("addSrcName").value.trim()||"未命名源";
     return post("/api/sources",{action:"add",name:$("addSrcName").value.trim(),url:$("addSrcUrl").value.trim(),
-      interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked})
+      interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked,
+      groups:$("addSrcGroups").value.trim()})
       .then(function(j){ if(!j)return;
-        ["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;
+        ["addSrcName","addSrcUrl","addSrcGroups"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;
         toast("已添加数据源「"+name+"」","ok"); loadStatus(); });
   }
   function addGroup(){

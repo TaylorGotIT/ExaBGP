@@ -348,6 +348,46 @@ def get_runtime_config():
         "MIN_INTERVAL": 10,
     }
 
+def parse_group_refs(raw):
+    """把分组引用（组名或 id，逗号/空格分隔）解析为 id 列表；空 = 全部分组"""
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        parts = [str(x).strip() for x in raw if str(x).strip()]
+    else:
+        parts = [x for x in re.split(r"[,，\s]+", str(raw).strip()) if x]
+    ids = []
+    for p in parts:
+        if p in GROUPS:
+            if p not in ids:
+                ids.append(p)
+            continue
+        hit = [gid for gid, g in GROUPS.items() if g.get("name") == p]
+        if not hit:
+            raise ValueError(f"分组不存在：{p}")
+        if hit[0] not in ids:
+            ids.append(hit[0])
+    return ids
+
+def source_groups(s):
+    """该数据源可见的分组：groups 为空 = 全部启用分组"""
+    bound = s.get("groups") or []
+    if not bound:
+        return [g for g in GROUPS.values() if g["enabled"]]
+    return [GROUPS[gid] for gid in bound if gid in GROUPS and GROUPS[gid]["enabled"]]
+
+def routes_for_group(gid):
+    """某分组实际可见的路由并集（只统计绑定到该组、或未绑定任何组的启用源）"""
+    u = set()
+    for s in SOURCES.values():
+        if not s["enabled"]:
+            continue
+        bound = s.get("groups") or []
+        if bound and gid not in bound:
+            continue
+        u |= s["routes"]
+    return u
+
 def union_routes():
     """所有启用数据源的并集"""
     u = set()
@@ -360,6 +400,7 @@ def status_payload():
     srcs = [{
         "id": s["id"], "name": s["name"], "url": s["url"],
         "interval": s["interval"], "enabled": s["enabled"],
+        "groups": list(s.get("groups") or []),
         "routes_count": len(s["routes"]),
         "last_status": s["last_status"], "last_time": s["last_time"],
     } for s in SOURCES.values()]
@@ -393,6 +434,7 @@ def save_config():
             "sources": [{
                 "id": s["id"], "name": s["name"], "url": s["url"],
                 "interval": s["interval"], "enabled": s["enabled"],
+                "groups": list(s.get("groups") or []),
             } for s in SOURCES.values()],
             "groups": [{
                 "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
@@ -425,6 +467,7 @@ def load_config():
                 "id": s["id"], "name": s.get("name", s["url"]), "url": s["url"],
                 "interval": max(10, int(s.get("interval", 3600))),
                 "enabled": bool(s.get("enabled", True)),
+                "groups": list(s.get("groups") or []),
                 "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
             }
         for g in cfg.get("groups", []):
@@ -476,7 +519,8 @@ def bootstrap_defaults():
     interval = max(10, interval)
     SOURCES["s1"] = {
         "id": "s1", "name": "默认源", "url": cfg["DATA_URL"], "interval": interval,
-        "enabled": True, "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
+        "enabled": True, "groups": [], "routes": set(),
+        "last_status": "未执行", "last_time": "N/A", "next_due": 0,
     }
     GROUPS["g1"] = {
         "id": "g1", "name": "默认组",
@@ -668,7 +712,22 @@ def download_url(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=15) as response:
         lines = response.read().decode('utf-8').splitlines()
-    return {line.strip() for line in lines if line.strip() and not line.startswith("#")}
+    out = set()
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "/" not in line:
+            try:
+                ipaddress.ip_address(line)
+                line = line + "/32"          # IPS 黑名单常见裸 IP
+            except ValueError:
+                continue
+        try:
+            out.add(str(ipaddress.ip_network(line, strict=False)))
+        except ValueError:
+            continue
+    return out
 
 def source_cache_path(sid):
     return os.path.join(SOURCES_DIR, sid + ".json")
@@ -698,25 +757,34 @@ async def source_refresh_job(sid):
         sse_broadcast_status()
         return
 
-    prev = s["routes"]
-    others = set()
-    for o in SOURCES.values():
-        if o is not s and o["enabled"]:
-            others |= o["routes"]
-    to_announce = latest - prev
-    to_withdraw = (prev - latest) - others   # 其他源仍覆盖的前缀不撤
-
-    if to_withdraw:
-        await write_withdraws(to_withdraw)
-    if to_announce:
-        await write_announces(to_announce)
+    # 按"该分组可见的源并集"分别做差分：不同源可以绑定到不同分组（如 IPS 黑洞）
+    affected = [g["id"] for g in source_groups(s)]
+    before = {gid: routes_for_group(gid) for gid in affected}
 
     s["routes"] = latest
+
+    total_add = total_del = 0
+    for gid in affected:
+        g = GROUPS.get(gid)
+        if not g or not g["enabled"]:
+            continue
+        after = routes_for_group(gid)
+        add = after - before[gid]
+        dele = before[gid] - after
+        if dele:
+            await write_withdraws(dele, only_id=gid)
+        if add:
+            await write_announces(add, only_id=gid)
+        total_add += len(add)
+        total_del += len(dele)
+        if add or dele:
+            log(f"🔁 分组 [{g['name']}] 差分：+{len(add)} / -{len(dele)}（可下发 {len(after)} 条）")
+
     await asyncio.to_thread(save_source_routes, sid)
-    s["last_status"] = f"成功 (新增 {len(to_announce)}, 撤回 {len(to_withdraw)}, 本源 {len(latest)})"
+    s["last_status"] = f"成功 (新增 {total_add}, 撤回 {total_del}, 本源 {len(latest)})"
     s["last_time"] = LAST_REFRESH_TIME
-    LAST_REFRESH_STATUS = f"源[{s['name']}] 成功：新增 {len(to_announce)} / 撤回 {len(to_withdraw)} / 全库 {len(union_routes())}"
-    log(f"🎉 [源:{s['name']}] 差分完成：新增 {len(to_announce)}，撤回 {len(to_withdraw)}，全库 {len(union_routes())} 条")
+    LAST_REFRESH_STATUS = f"源[{s['name']}] 成功：新增 {total_add} / 撤回 {total_del} / 全库 {len(union_routes())}"
+    log(f"🎉 [源:{s['name']}] 差分完成：新增 {total_add}，撤回 {total_del}，全库 {len(union_routes())} 条")
     sse_broadcast_status()
 
 def save_source_routes(sid):
@@ -732,17 +800,39 @@ async def flush_source_routes(sid):
     s = SOURCES.get(sid)
     if not s:
         return
-    others = set()
-    for o in SOURCES.values():
-        if o is not s and o["enabled"]:
-            others |= o["routes"]
-    to_withdraw = s["routes"] - others
-    if to_withdraw:
-        await write_withdraws(to_withdraw)
-        log(f"🗑️ [源:{s['name']}] 已撤回 {len(to_withdraw)} 条不再覆盖的路由")
+    affected = [g["id"] for g in source_groups(s)]
+    before = {gid: routes_for_group(gid) for gid in affected}
     s["routes"] = set()
+    total = 0
+    for gid in affected:
+        g = GROUPS.get(gid)
+        if not g or not g["enabled"]:
+            continue
+        dele = before[gid] - routes_for_group(gid)
+        if dele:
+            await write_withdraws(dele, only_id=gid)
+            total += len(dele)
+    if total:
+        log(f"🗑️ [源:{s['name']}] 已按分组撤回 {total} 条不再覆盖的路由")
     s["last_status"] = "已停用/删除，路由已从邻居撤回"
     s["last_time"] = time.strftime('%Y-%m-%d %H:%M:%S')
+
+async def resync_source_binding(before_ids, before_sets, after_ids):
+    """数据源分组绑定变化后：旧组撤掉不可见的路由，新组补发可见的路由"""
+    for gid in dict.fromkeys(list(before_ids) + list(after_ids)):
+        g = GROUPS.get(gid)
+        if not g or not g["enabled"]:
+            continue
+        after = routes_for_group(gid)
+        before = before_sets.get(gid, set())
+        dele = before - after
+        add = after - before
+        if dele:
+            await write_withdraws(dele, only_id=gid)
+        if add:
+            await write_announces(add, only_id=gid)
+        if add or dele:
+            log(f"🔁 数据源绑定变化 → 分组 [{g['name']}]：+{len(add)} / -{len(dele)}")
 
 async def delete_source(sid):
     await flush_source_routes(sid)
@@ -803,9 +893,9 @@ async def announce_union_to_group(gid):
     g = GROUPS.get(gid)
     if not g:
         return
-    prefixes = union_routes()
+    prefixes = routes_for_group(gid)
     await write_announces(prefixes, only_id=gid)
-    log(f"📢 分组 [{g['name']}] 已补发全库 {len(prefixes)} 条路由（重新启用或属性变更）")
+    log(f"📢 分组 [{g['name']}] 已补发 {len(prefixes)} 条路由（重新启用或属性变更）")
     sse_broadcast_status()
 
 async def withdraw_all_from_group(gid):
@@ -813,7 +903,7 @@ async def withdraw_all_from_group(gid):
     g = GROUPS.get(gid)
     if not g:
         return
-    prefixes = union_routes()
+    prefixes = routes_for_group(gid)
     if prefixes:
         await write_withdraws(prefixes, only_id=gid)
         log(f"🗑️ 分组 [{g['name']}] 已停用/删除，撤回 {len(prefixes)} 条路由")
@@ -918,6 +1008,7 @@ class SourcesApiHandler(BaseHandler):
                     "id": sid, "name": str(data.get("name") or url),
                     "url": url, "interval": max(10, int(data.get("interval", 3600))),
                     "enabled": bool(data.get("enabled", True)),
+                    "groups": parse_group_refs(data.get("groups")),
                     "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
                 }
                 save_config()
@@ -929,6 +1020,8 @@ class SourcesApiHandler(BaseHandler):
                 s = SOURCES.get(sid)
                 if not s:
                     raise ValueError(f"数据源 {sid} 不存在")
+                before_ids = [g["id"] for g in source_groups(s)]
+                before_sets = {gid: routes_for_group(gid) for gid in before_ids}
                 if "name" in data and str(data["name"]).strip():
                     s["name"] = str(data["name"]).strip()
                 if "url" in data and str(data["url"]).strip() != s["url"]:
@@ -938,6 +1031,8 @@ class SourcesApiHandler(BaseHandler):
                 if "interval" in data:
                     s["interval"] = max(10, int(data["interval"]))
                     s["next_due"] = time.time() + s["interval"]     # 新频率立即生效
+                if "groups" in data:
+                    s["groups"] = parse_group_refs(data.get("groups"))
                 if "enabled" in data and bool(data["enabled"]) != s["enabled"]:
                     if bool(data["enabled"]):
                         s["enabled"] = True
@@ -946,6 +1041,10 @@ class SourcesApiHandler(BaseHandler):
                     else:
                         s["enabled"] = False
                         ioloop.add_callback(flush_source_routes, sid)
+                # 绑定变化：对旧组撤回、对新组补发（先撤后宣）
+                after_ids = [g["id"] for g in source_groups(s)]
+                if s["enabled"] and set(before_ids) != set(after_ids):
+                    await resync_source_binding(before_ids, before_sets, after_ids)
                 save_config()
                 log(f"✏️ 数据源 [{s['name']}] 已更新")
                 self.write({"status": "ok", "id": sid})
