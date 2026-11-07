@@ -329,7 +329,8 @@
             <td><input id="addSrcInterval" type="number" value="3600" min="10"></td>
             <td class="ctr"><input id="addSrcEnabled" type="checkbox" class="chk" checked></td>
             <td><input id="addSrcGroups" placeholder="留空=全部组"></td>
-            <td class="status-text">添加后立即进入调度</td>
+            <td><label class="inline" title="勾选后自动使用固定的 IPS 黑洞分组：下一跳 192.0.2.1、community 65535:666">
+              <input type="checkbox" id="addSrcIps" class="chk"> IPS 黑名单</label></td>
             <td class="act"><button id="btnAddSrc" class="primary sm">添加源</button></td>
           </tr>
         </tfoot>
@@ -960,7 +961,14 @@
       const c2=el("td"); c2.appendChild(ur);
       const c3=cell("num"); c3.appendChild(iv);
       const c4=cell("ctr"); c4.appendChild(en);
-      const c5=el("td"); c5.appendChild(gs);
+      const c5=el("td");
+      if(s.ips){
+        const tag=el("span","st est","IPS 黑洞");
+        tag.title="自动绑定 IPS-BLACKHOLE（隔离组），固定下一跳 192.0.2.1 / community 65535:666";
+        c5.appendChild(tag);
+      }else{
+        c5.appendChild(gs);
+      }
       const c6=el("td"); c6.appendChild(st);
       const c7=cell("act");
       const sv=el("button","sm","保存"); sv.onclick=function(){saveSource(s,tr,sv);};
@@ -1125,9 +1133,9 @@
     const name=$("addSrcName").value.trim()||"未命名源";
     return post("/api/sources",{action:"add",name:$("addSrcName").value.trim(),url:$("addSrcUrl").value.trim(),
       interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked,
-      groups:$("addSrcGroups").value.trim()})
+      groups:$("addSrcGroups").value.trim(),ips:$("addSrcIps").checked})
       .then(function(j){ if(!j)return;
-        ["addSrcName","addSrcUrl","addSrcGroups"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;
+        ["addSrcName","addSrcUrl","addSrcGroups"].forEach(function(i){$(i).value="";});$("addSrcIps").checked=false;$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;
         toast("已添加数据源「"+name+"」","ok"); loadStatus(); });
   }
   function addGroup(){

@@ -111,6 +111,51 @@ def _write_disk_log(item):
     except Exception:
         pass
 
+# ============ IPS 黑名单：固定黑洞下一跳与社区（无需手工配组） ============
+IPS_GROUP_NAME = "IPS-BLACKHOLE"
+IPS_NEXT_HOP = "192.0.2.1"          # RFC 6666 Discard Prefix
+IPS_COMMUNITY = "65535:666"         # RFC 7999 BLACKHOLE
+
+def ensure_ips_group():
+    """确保 IPS 黑洞分组存在并校准为固定值：隔离 + 固定 next-hop/community，邻居跟随第一个普通组"""
+    g = None
+    for x in GROUPS.values():
+        if x.get("ips") or x.get("name") == IPS_GROUP_NAME:
+            g = x
+            break
+    if g is None:
+        donor = None
+        for x in GROUPS.values():
+            if x["enabled"] and not x.get("ips"):
+                donor = x
+                break
+        gid = "gips" + uuid.uuid4().hex[:4]
+        GROUPS[gid] = {
+            "id": gid, "name": IPS_GROUP_NAME,
+            "neighbors": list(donor["neighbors"]) if donor else [],
+            "next_hop": IPS_NEXT_HOP, "community": IPS_COMMUNITY,
+            "isolated": True, "ips": True, "enabled": True,
+            "med": "", "prepend": 0,
+            "local_as": "", "peer_as": "", "local_address": "", "router_id": "",
+        }
+        save_config()
+        tornado.ioloop.IOLoop.current().add_callback(regenerate_conf, "创建 IPS 黑洞分组")
+        tornado.ioloop.IOLoop.current().add_callback(announce_union_to_group, gid)
+        log(f"🛡️ 已创建 IPS 黑洞分组 [{IPS_GROUP_NAME}]：邻居 {GROUPS[gid]['neighbors']} · 下一跳 {IPS_NEXT_HOP} · 属性 {IPS_COMMUNITY}")
+        return gid
+    changed = False
+    if g.get("next_hop") != IPS_NEXT_HOP:
+        g["next_hop"] = IPS_NEXT_HOP; changed = True
+    if g.get("community") != IPS_COMMUNITY:
+        g["community"] = IPS_COMMUNITY; changed = True
+    if not g.get("isolated"):
+        g["isolated"] = True; changed = True
+    if not g.get("ips"):
+        g["ips"] = True; changed = True
+    if changed:
+        save_config()
+    return g["id"]
+
 # ============ 访问令牌 / 角色（未配置 API_TOKEN 时不启用鉴权） ============
 API_TOKEN = os.environ.get("API_TOKEN", "").strip()
 VIEWER_TOKEN = os.environ.get("VIEWER_TOKEN", "").strip()
@@ -410,6 +455,7 @@ def status_payload():
     srcs = [{
         "id": s["id"], "name": s["name"], "url": s["url"],
         "interval": s["interval"], "enabled": s["enabled"],
+        "ips": bool(s.get("ips", False)),
         "groups": list(s.get("groups") or []),
         "routes_count": len(s["routes"]),
         "last_status": s["last_status"], "last_time": s["last_time"],
@@ -444,6 +490,7 @@ def save_config():
             "sources": [{
                 "id": s["id"], "name": s["name"], "url": s["url"],
                 "interval": s["interval"], "enabled": s["enabled"],
+                "ips": bool(s.get("ips", False)),
                 "groups": list(s.get("groups") or []),
             } for s in SOURCES.values()],
             "groups": [{
@@ -477,6 +524,7 @@ def load_config():
                 "id": s["id"], "name": s.get("name", s["url"]), "url": s["url"],
                 "interval": max(10, int(s.get("interval", 3600))),
                 "enabled": bool(s.get("enabled", True)),
+                "ips": bool(s.get("ips", False)),
                 "groups": list(s.get("groups") or []),
                 "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
             }
@@ -487,6 +535,7 @@ def load_config():
                 "next_hop": g.get("next_hop", ""), "community": g.get("community", ""),
                 "enabled": bool(g.get("enabled", True)),
                 "isolated": bool(g.get("isolated", False)),
+                "ips": bool(g.get("ips", False)),
                 "med": str(g.get("med", "") or ""), "prepend": int(g.get("prepend", 0) or 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
@@ -1021,11 +1070,14 @@ class SourcesApiHandler(BaseHandler):
                 if not url:
                     raise ValueError("url 不能为空")
                 sid = "s" + uuid.uuid4().hex[:6]
+                is_ips = bool(data.get("ips"))
+                gid_ips = ensure_ips_group() if is_ips else None
                 SOURCES[sid] = {
                     "id": sid, "name": str(data.get("name") or url),
                     "url": url, "interval": max(10, int(data.get("interval", 3600))),
                     "enabled": bool(data.get("enabled", True)),
-                    "groups": parse_group_refs(data.get("groups")),
+                    "ips": is_ips,
+                    "groups": [gid_ips] if is_ips else parse_group_refs(data.get("groups")),
                     "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
                 }
                 save_config()
@@ -1048,7 +1100,14 @@ class SourcesApiHandler(BaseHandler):
                 if "interval" in data:
                     s["interval"] = max(10, int(data["interval"]))
                     s["next_due"] = time.time() + s["interval"]     # 新频率立即生效
-                if "groups" in data:
+                if data.get("ips"):
+                    s["ips"] = True
+                    s["groups"] = [ensure_ips_group()]
+                elif "ips" in data and not data.get("ips"):
+                    s["ips"] = False
+                    if "groups" in data:
+                        s["groups"] = parse_group_refs(data.get("groups"))
+                elif "groups" in data:
                     s["groups"] = parse_group_refs(data.get("groups"))
                 if "enabled" in data and bool(data["enabled"]) != s["enabled"]:
                     if bool(data["enabled"]):
