@@ -176,6 +176,7 @@
   .modal-box.sm{width:min(540px,94vw)}
   .cfm-body{font-size:13px;line-height:1.75;color:var(--text)}
   .cfm-body .warnline{color:var(--amber);margin-top:8px}
+  .cfm-body .mono{font-family:Consolas,'Courier New',monospace;font-size:11.5px;color:var(--green);white-space:pre-wrap;word-break:break-all;line-height:1.5;padding-left:8px;border-left:2px solid var(--border)}
   .cfm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
   button.dangerous{background:#7a2b2f;border-color:#a3383d;color:#ffe3e2}
   button.dangerous:hover{background:#8f3237;border-color:var(--red)}
@@ -414,6 +415,7 @@
         <input id="rgAddPrefix" placeholder="添加前缀，如 13.107.6.0/24">
         <button id="rgAddPrefixBtn" class="primary sm">添加</button>
         <input id="rgFilter" placeholder="搜索前缀…">
+        <button id="rgExport" class="sm">导出 CSV</button>
         <span class="nbq-res status-text" id="rgModalCount" style="color:var(--muted)"></span>
       </div>
       <div class="rg-head"><span>前缀</span><span style="text-align:center">修改</span><span style="text-align:center">删除</span></div>
@@ -445,6 +447,7 @@
       <div class="rg-tool">
         <input id="auditFilter" placeholder="按 操作者 / 动作 / 目标 过滤…">
         <button id="auditRefresh" class="sm">刷新</button>
+        <button id="auditExport" class="sm">导出 CSV</button>
         <span class="status-text" id="auditCount"></span>
       </div>
       <div class="tbl-wrap" style="max-height:62vh;overflow:auto">
@@ -536,7 +539,10 @@
       const body=$("cfmBody"); body.innerHTML="";
       (opts.lines||[]).forEach(function(l){
         const isObj=(typeof l==="object");
-        const p=el("div", isObj&&l.warn?"warnline":null);
+        let cls=null;
+        if(isObj && l.warn) cls="warnline";
+        else if(isObj && l.mono) cls="mono";
+        const p=el("div", cls);
         p.textContent=isObj?l.text:l;
         body.appendChild(p);
       });
@@ -564,6 +570,36 @@
     let p;
     try { p=fn(); } catch(e){ done(); toast("操作异常："+e.message,"err"); return Promise.resolve(); }
     return Promise.resolve(p).then(function(v){ done(); return v; }, function(e){ done(); toast("操作失败："+e.message,"err"); });
+  }
+
+  // 前缀预检：返回 {valid, invalid, dup, total}
+  function precheckPrefixes(text){
+    const lines=String(text||"").split("\n").map(function(x){return x.trim();}).filter(Boolean);
+    const valid=[], invalid=[], dup=[], seen={};
+    lines.forEach(function(l){
+      const m=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(l);
+      const ok=m && (+m[1])<256 && (+m[2])<256 && (+m[3])<256 && (+m[4])<256 && (+m[5])<=32;
+      if(!ok){ invalid.push(l); return; }
+      if(seen[l]){ dup.push(l); return; }
+      seen[l]=1; valid.push(l);
+    });
+    return {valid:valid, invalid:invalid, dup:dup, total:lines.length};
+  }
+
+  // 导出 CSV（带 BOM，Excel 直接打开不乱码）
+  function downloadCSV(filename, rows){
+    const csv=rows.map(function(r){
+      return r.map(function(c){
+        const v=String(c==null?"":c);
+        return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+      }).join(",");
+    }).join("\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },800);
+    toast("已导出 "+filename,"ok");
   }
 
   // 搜索命中：q 为空或任一字段包含关键字
@@ -1032,11 +1068,25 @@
         $("addGrpPrepend").value="0";$("addGrpEnabled").checked=true;
         toast("已添加分组「"+name+"」","ok"); loadStatus(); });
   }
-  function addRouteGroup(){
+  async function addRouteGroup(){
     const name=$("addRgName").value.trim();
-    const prefixes=$("addRgPrefixes").value.trim();
+    let prefixes=$("addRgPrefixes").value.trim();
     if(!name){appendLog("❌ 添加失败：名称不能为空", "routegroup");toast("添加失败：名称不能为空","err");return Promise.resolve();}
     if(!prefixes){appendLog("❌ 添加失败：前缀列表不能为空（请手动粘贴至少一条前缀）", "routegroup");toast("添加失败：前缀列表不能为空","err");return Promise.resolve();}
+    const pre=precheckPrefixes(prefixes);
+    if(!pre.valid.length){
+      toast("前缀列表里没有合法 IPv4 CIDR","err");
+      return;
+    }
+    if(pre.invalid.length || pre.dup.length){
+      const lines=["输入 "+pre.total+" 行：合法 "+pre.valid.length+"，非法 "+pre.invalid.length+"，重复 "+pre.dup.length+"。"];
+      pre.invalid.slice(0,8).forEach(function(x){lines.push({text:"✗ "+x,mono:true});});
+      pre.dup.slice(0,5).forEach(function(x){lines.push({text:"↺ "+x+"（重复）",mono:true});});
+      lines.push({text:"将只提交合法的 "+pre.valid.length+" 条。",warn:true});
+      const go=await askConfirm({title:"前缀预检",lines:lines,okText:"仅提交合法项"});
+      if(!go)return;
+      prefixes=pre.valid.join("\n");
+    }
     const body={action:"add",name:name,prefixes:prefixes,
       next_hop:$("addRgNh").value.trim(),community:$("addRgComm").value.trim(),
       med:$("addRgMed").value.trim(),prepend:$("addRgPrepend").value.trim()};
@@ -1098,10 +1148,45 @@
     appendLog("✅ "+(act==="announce"?"手动发布":"手动撤回")+" "+j.count+" 条完成，明细已回显");
   }
 
+  // 下发预览：先 dry-run 拿到命令，再让运维确认
+  async function previewAnnounce(body, label){
+    const pre=await post("/bulk/announce", Object.assign({dry_run:true}, body));
+    if(!pre) return false;
+    const lines=[
+      "操作："+label,
+      "目标分组 "+pre.groups+" 个 · 路由 "+pre.count+" 条 · 生成命令 "+pre.commands_total+" 条"
+    ];
+    const cmds=(pre.commands||[]);
+    if(!cmds.length){
+      lines.push({text:"没有生成任何命令——请检查目标分组是否启用、前缀是否为空。",warn:true});
+    }else{
+      lines.push("前 "+Math.min(5,cmds.length)+" 条命令预览：");
+      cmds.slice(0,5).forEach(function(c){ lines.push({text:c.trim(),mono:true}); });
+      if(cmds.length>5) lines.push({text:"…",mono:true});
+    }
+    return await askConfirm({title:"下发预览（未执行）", lines:lines, okText:"确认下发"});
+  }
+
   // ---------- 手动发布/撤回 ----------
   async function manual(act,btn){
-    const routes=$("manualRoutes").value.split("\n").map(function(s){return s.trim();}).filter(Boolean);
-    if(!routes.length){appendLog("⚠️ 请先输入路由前缀");toast("请先输入路由前缀","warn");return;}
+    const pre=precheckPrefixes($("manualRoutes").value);
+    if(!pre.total){appendLog("⚠️ 请先输入路由前缀");toast("请先输入路由前缀","warn");return;}
+    if(!pre.valid.length){
+      await askConfirm({title:"前缀预检失败",lines:[
+        {text:"输入 "+pre.total+" 行，没有一条是合法 IPv4 CIDR。",warn:true},
+        {text:"示例：192.0.2.0/24",mono:true}
+      ],okText:"知道了"});
+      return;
+    }
+    if(pre.invalid.length || pre.dup.length){
+      const lines=["输入 "+pre.total+" 行：合法 "+pre.valid.length+"，非法 "+pre.invalid.length+"，重复 "+pre.dup.length+"。"];
+      pre.invalid.slice(0,8).forEach(function(x){lines.push({text:"✗ "+x,mono:true});});
+      pre.dup.slice(0,5).forEach(function(x){lines.push({text:"↺ "+x+"（重复）",mono:true});});
+      lines.push({text:"将只提交合法的 "+pre.valid.length+" 条。",warn:true});
+      const go=await askConfirm({title:"前缀预检",lines:lines,okText:"仅提交合法项"});
+      if(!go)return;
+    }
+    const routes=pre.valid;
     if(act==="withdraw"){
       const g=$("grpSel").options[$("grpSel").selectedIndex].textContent;
       const ok=await askConfirm({
@@ -1116,6 +1201,10 @@
       if(!ok)return;
     }
     const body={group:$("grpSel").value,routes:routes};
+    if(act==="announce"){
+      const ok=await previewAnnounce(body,"手动发布 "+routes.length+" 条前缀");
+      if(!ok)return;
+    }
     const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
     const j=await busy(btn,function(){return post(url,body);});
     if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+routes.length+" 条前缀","ok"); }
@@ -1144,6 +1233,10 @@
       if(!ok)return;
     }
     const body={group:$("rgTarget").value,route_groups:ids};
+    if(act==="announce"){
+      const ok=await previewAnnounce(body,"发布路由组 "+ids.length+" 个（"+total+" 条前缀）");
+      if(!ok)return;
+    }
     const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
     const j=await busy(btn,function(){return post(url,body);});
     if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+ids.length+" 个路由组（"+total+" 条前缀）","ok"); }
@@ -1407,6 +1500,7 @@
   }
 
   // ---------- 操作审计 ----------
+  let AUDIT_ITEMS=[];
   async function loadAudit(){
     const q = $("auditFilter").value.trim();
     try{
@@ -1414,6 +1508,7 @@
       if(r.status === 401){ needToken(); return; }
       const d = await r.json();
       const items = d.items || [];
+      AUDIT_ITEMS = items;
       $("auditCount").textContent = "共 " + items.length + " 条";
       const body = $("auditBody"); body.innerHTML = "";
       if(!items.length){ body.appendChild(emptyRow(5, q ? "没有匹配的审计记录" : "暂无审计记录")); return; }
@@ -1471,6 +1566,19 @@
   $("btnAudit").onclick=function(){ $("auditModal").classList.remove("hidden"); loadAudit(); };
   $("auditClose").onclick=function(){ $("auditModal").classList.add("hidden"); };
   $("auditRefresh").onclick=loadAudit;
+  $("auditExport").onclick=function(){
+    if(!AUDIT_ITEMS.length){ toast("没有可导出的审计记录","warn"); return; }
+    const rows=[["时间","操作者","来源IP","动作","目标","结果","明细"]];
+    AUDIT_ITEMS.forEach(function(it){
+      rows.push([it.t,it.actor,it.ip,it.action,it.target,it.result,JSON.stringify(it.detail||{})]);
+    });
+    downloadCSV("exabgp-audit.csv",rows);
+  };
+  $("rgExport").onclick=function(){
+    const ps=(curRgData.prefixes||[]);
+    if(!ps.length){ toast("路由组没有前缀可导出","warn"); return; }
+    downloadCSV((curRgData.name||"routegroup")+"-prefixes.csv",[["prefix"]].concat(ps.map(function(x){return [x];})));
+  };
   let auditTimer=null;
   $("auditFilter").addEventListener("input",function(){ clearTimeout(auditTimer); auditTimer=setTimeout(loadAudit,300); });
   $("btnToken").onclick=function(){ $("tokenModal").classList.remove("hidden"); $("tokenInput").value=TOKEN; $("tokenInput").focus(); };

@@ -830,7 +830,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def prepare(self):
         self.role = "operator"
-        if self.request.path in ("/", "/index.html", "/health"):
+        if self.request.path in ("/", "/index.html", "/health", "/metrics"):
             return          # 页面本身与健康检查不要求令牌
         if not API_TOKEN:
             return
@@ -1293,6 +1293,10 @@ class BulkAnnounceHandler(BaseHandler):
                                              "community": c, "med": m, "prepend": pr})
                         cmds.append(announce_command(n, item["route"], nh, c, m, pr, g.get("local_as")))
                 detail.append(gd)
+            if data.get("dry_run"):
+                self.write({"status": "ok", "dry_run": True, "count": len(items), "groups": len(detail),
+                            "commands_total": len(cmds), "commands": cmds[:50], "detail": detail})
+                return
             await asyncio.to_thread(write_to_pipe, cmds)
             sse_broadcast_status()
             self.write({"status": "ok", "count": len(items), "groups": len(detail), "detail": detail})
@@ -1315,6 +1319,10 @@ class BulkWithdrawHandler(BaseHandler):
                 for n in g["neighbors"]:
                     for r in routes:
                         cmds.append(f"neighbor {n} withdraw route {r}\n")
+            if data.get("dry_run"):
+                self.write({"status": "ok", "dry_run": True, "count": len(routes), "groups": len(detail),
+                            "commands_total": len(cmds), "commands": cmds[:50], "detail": detail})
+                return
             await asyncio.to_thread(write_to_pipe, cmds)
             sse_broadcast_status()
             self.write({"status": "ok", "count": len(routes), "groups": len(detail), "detail": detail})
@@ -1428,6 +1436,45 @@ class AdjRibHandler(BaseHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
+class MetricsHandler(BaseHandler):
+    """Prometheus 文本格式指标（只读，供监控系统抓取）"""
+
+    def get(self):
+        out = []
+        try:
+            cached = len(union_routes())
+            out.append("# HELP exabgp_cached_routes 全库并集路由数")
+            out.append("# TYPE exabgp_cached_routes gauge")
+            out.append(f"exabgp_cached_routes {cached}")
+            out.append("# HELP exabgp_sources_total 数据源数量")
+            out.append("# TYPE exabgp_sources_total gauge")
+            out.append(f"exabgp_sources_total {len(SOURCES)}")
+            out.append("# HELP exabgp_groups_total 邻居分组数量")
+            out.append("# TYPE exabgp_groups_total gauge")
+            out.append(f"exabgp_groups_total {len(GROUPS)}")
+            out.append("# HELP exabgp_routegroups_total IP 路由组数量")
+            out.append("# TYPE exabgp_routegroups_total gauge")
+            out.append(f"exabgp_routegroups_total {len(ROUTE_GROUPS)}")
+            out.append("# HELP exabgp_source_routes 单源路由条数")
+            out.append("# TYPE exabgp_source_routes gauge")
+            for sid, src in SOURCES.items():
+                out.append(f'exabgp_source_routes{{source="{sid}",name="{src.get("name",sid)}"}} {len(src.get("routes", []))}')
+            out.append("# HELP exabgp_neighbor_state BGP 邻居是否 Established(1)/否(0)")
+            out.append("# TYPE exabgp_neighbor_state gauge")
+            out.append("# HELP exabgp_neighbor_adj_rib_out 邻居已发布路由条数")
+            out.append("# TYPE exabgp_neighbor_adj_rib_out gauge")
+            for ip, st in NEIGHBOR_STATES.items():
+                up = 1 if (st.get("state") == "Established") else 0
+                out.append(f'exabgp_neighbor_state{{peer="{ip}"}} {up}')
+                out.append(f'exabgp_neighbor_adj_rib_out{{peer="{ip}"}} {len(st.get("adj_rib_out", []))}')
+            out.append("# HELP exabgp_last_refresh_timestamp 最近一次数据源刷新时间戳")
+            out.append("# TYPE exabgp_last_refresh_timestamp gauge")
+            out.append(f"exabgp_last_refresh_timestamp {int(time.time()) if LAST_REFRESH_TIME != 'N/A' else 0}")
+        except Exception as e:
+            out.append(f"# metrics error: {e}")
+        self.set_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        self.write("\n".join(out) + "\n")
+
 class AuditHandler(BaseHandler):
     async def get(self):
         try:
@@ -1491,6 +1538,7 @@ def make_app():
         (r"/api/monitor_config", MonitorConfigHandler),
         (r"/api/adjrib", AdjRibHandler),
         (r"/api/audit", AuditHandler),
+        (r"/metrics", MetricsHandler),
         (r"/health", HealthHandler),
         (r"/bulk/announce", BulkAnnounceHandler),
         (r"/bulk/withdraw", BulkWithdrawHandler),

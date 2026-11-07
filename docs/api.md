@@ -24,6 +24,34 @@
 | POST | `/bulk/withdraw` | 手动撤回 |
 | GET | `/api/logs` | SSE 实时日志 |
 | GET | `/api/audit?limit=200&q=` | 操作审计记录（新→旧，可按关键字过滤） |
+| GET | `/metrics` | Prometheus 指标（`text/plain; version=0.0.4`，与 `/health` 一样免鉴权） |
+
+### 下发预演（dry-run）
+
+`/bulk/announce` 与 `/bulk/withdraw` 支持 `"dry_run": true`：只生成命令并返回，不写入管道、不影响现网。
+
+```bash
+curl -X POST http://127.0.0.1:9550/bulk/announce -H 'Content-Type: application/json' -d '{
+  "group":"", "routes":["203.0.113.0/24"], "dry_run":true
+}'
+# → {"status":"ok","dry_run":true,"count":1,"groups":2,"commands_total":2,
+#    "commands":["neighbor ... announce route 203.0.113.0/24 ..."],"detail":[...]}
+```
+
+控制台的「发布」按钮就是先 dry-run、展示命令预览、确认后才真正下发。
+
+### /metrics 指标
+
+```
+exabgp_cached_routes 6204
+exabgp_sources_total 1
+exabgp_groups_total 2
+exabgp_routegroups_total 2
+exabgp_source_routes{source="s1",name="默认源"} 6204
+exabgp_neighbor_state{peer="192.168.75.241"} 1
+exabgp_neighbor_adj_rib_out{peer="192.168.75.241"} 0
+exabgp_last_refresh_timestamp 1794071485
+```
 
 ## 鉴权（可选）
 
