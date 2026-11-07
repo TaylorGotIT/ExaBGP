@@ -77,7 +77,11 @@ curl -fsS "http://127.0.0.1:$PORT/api/status" | head -c 320; echo
 echo "--- 缓存头 ---"
 curl -sI "http://127.0.0.1:$PORT/index.html" | grep -i '^cache-control' || echo "（无 Cache-Control，旧版本镜像？）"
 echo "--- 页面 favicon ---"
-curl -s "http://127.0.0.1:$PORT/index.html" | grep -c 'rel="icon"' | sed 's/^/内联 favicon 数: /'
+if curl -s "http://127.0.0.1:$PORT/index.html" | grep -q 'rel="icon"'; then
+  echo "OK：页面内联 favicon 存在"
+else
+  echo "WARN：页面没有 favicon（镜像可能未更新）"
+fi
 echo "--- 邻居 ---"
 curl -fsS "http://127.0.0.1:$PORT/api/neighbors" | head -c 300; echo
 
