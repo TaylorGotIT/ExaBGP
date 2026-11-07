@@ -10,7 +10,34 @@
     --bg:#0c1322; --panel:#131c30; --panel2:#0f1728; --border:#243354; --text:#dbe4f5;
     --muted:#8ea0c0; --accent:#6d8dff; --green:#2dd4a7; --amber:#f5b85c; --red:#f4716e; --sky:#5cc8f5;
     --row-hover:rgba(109,141,255,.07);
+    --btn-bg:#1c2a4a; --btn-hover:#24355e; --badge-bg:#17233f; --dot-off:#5b6b82;
+    --scroll-thumb:#2a3a5e; --scroll-thumb-hover:#3a4b6e; --mask:rgba(5,10,20,.68);
+    --accent-ink:#081020; --accent-hover:#8aa3ff;
+    --danger-bg:#7a2b2f; --danger-border:#a3383d; --danger-bg-hover:#8f3237;
+    --danger-ink:#ffe3e2; --danger-hover:#5a2430;
+    --alert-err-ink:#ffcdca; --alert-warn-ink:#ffe1b3;
+    color-scheme:dark;
   }
+  /* ---------- 浅色主题 ---------- */
+  :root[data-theme="light"]{
+    --bg:#f2f5fa; --panel:#ffffff; --panel2:#f6f8fc; --border:#d9e2ef; --text:#1a2433;
+    --muted:#5b6a82; --accent:#3b5bdb; --green:#0e9f6e; --amber:#b7791f; --red:#d64545; --sky:#1f78b4;
+    --row-hover:rgba(59,91,219,.06);
+    --btn-bg:#eef2f9; --btn-hover:#e2e9f5; --badge-bg:#e9efff; --dot-off:#9aa7bb;
+    --scroll-thumb:#c6d0e2; --scroll-thumb-hover:#aebbd2; --mask:rgba(18,28,45,.35);
+    --accent-ink:#ffffff; --accent-hover:#2f4bc4;
+    --danger-bg:#c0392b; --danger-border:#a93226; --danger-bg-hover:#a93226;
+    --danger-ink:#ffffff; --danger-hover:#fdecea;
+    --alert-err-ink:#8a1f1a; --alert-warn-ink:#7a4f06;
+    color-scheme:light;
+  }
+  :root[data-theme="light"] .card,
+  :root[data-theme="light"] .panel{box-shadow:0 1px 2px rgba(16,24,40,.05)}
+  :root[data-theme="light"] .modal-box{box-shadow:0 18px 48px rgba(16,24,40,.22)}
+  :root[data-theme="light"] .toast{box-shadow:0 10px 24px rgba(16,24,40,.16)}
+  :root[data-theme="light"] tr.detail td{background:rgba(59,91,219,.05)}
+  :root[data-theme="light"] tr.detail:hover td{background:rgba(59,91,219,.05)!important}
+  :root[data-theme="light"] .lg-group{background:#fbfcfe}
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Microsoft YaHei',system-ui,sans-serif;font-size:13.5px;padding:18px 22px 34px}
   .wrap{max-width:1560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
@@ -20,9 +47,9 @@
   header h1{font-size:18px;font-weight:700;letter-spacing:.4px;line-height:1.2}
   header .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
   .spacer{flex:1 1 auto}
-  .badge{display:inline-flex;align-items:center;gap:7px;background:#17233f;border:1px solid var(--border);color:var(--sky);border-radius:999px;padding:4px 12px;font-size:12px;white-space:nowrap}
+  .badge{display:inline-flex;align-items:center;gap:7px;background:var(--badge-bg);border:1px solid var(--border);color:var(--sky);border-radius:999px;padding:4px 12px;font-size:12px;white-space:nowrap}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:0 0 auto}
-  .dot.off{background:#5b6b82}
+  .dot.off{background:var(--dot-off)}
 
   /* ---------- KPI ---------- */
   .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
@@ -70,11 +97,11 @@
   .mini-label{font-size:11.5px;color:var(--muted);margin-bottom:4px}
 
   /* ---------- 按钮 ---------- */
-  button{background:#1c2a4a;border:1px solid var(--border);color:var(--text);border-radius:6px;height:30px;padding:0 12px;font-size:12.5px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .12s,border-color .12s}
-  button:hover{background:#24355e;border-color:var(--accent)}
-  button.primary{background:var(--accent);color:#081020;border-color:transparent;font-weight:600}
-  button.primary:hover{background:#8aa3ff}
-  button.danger:hover{background:#5a2430;border-color:var(--red)}
+  button{background:var(--btn-bg);border:1px solid var(--border);color:var(--text);border-radius:6px;height:30px;padding:0 12px;font-size:12.5px;cursor:pointer;white-space:nowrap;font-family:inherit;transition:background .12s,border-color .12s}
+  button:hover{background:var(--btn-hover);border-color:var(--accent)}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600}
+  button.primary:hover{background:var(--accent-hover)}
+  button.danger:hover{background:var(--danger-hover);border-color:var(--red)}
   button.sm{height:26px;padding:0 9px;font-size:12px}
   .tbl td.act button+button{margin-left:6px}
 
@@ -144,7 +171,7 @@
   .bulk-routes{font-family:Consolas,monospace;font-size:12px;color:var(--green);line-height:1.7;background:var(--panel);border-radius:6px;padding:6px 8px;margin-top:4px;max-height:200px;overflow-y:auto}
 
   /* ---------- 弹窗 ---------- */
-  .modal{position:fixed;inset:0;background:rgba(5,10,20,.68);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal{position:fixed;inset:0;background:var(--mask);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
   .modal.hidden{display:none}
   .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;width:min(820px,96vw);max-height:84vh;display:flex;flex-direction:column;padding:14px 16px;box-shadow:0 14px 44px rgba(0,0,0,.55)}
   .modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
@@ -162,13 +189,13 @@
   .alert-bar{display:none;flex-direction:column;gap:6px}
   .alert-bar.on{display:flex}
   .alert{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-radius:8px;font-size:12.5px;line-height:1.55;border:1px solid}
-  .alert.err{background:rgba(244,113,110,.10);border-color:rgba(244,113,110,.45);color:#ffcdca}
-  .alert.warn{background:rgba(245,184,92,.10);border-color:rgba(245,184,92,.42);color:#ffe1b3}
+  .alert.err{background:rgba(244,113,110,.10);border-color:rgba(244,113,110,.45);color:var(--alert-err-ink)}
+  .alert.warn{background:rgba(245,184,92,.10);border-color:rgba(245,184,92,.42);color:var(--alert-warn-ink)}
   .alert .ic{flex:0 0 auto}
 
   /* ---------- toast ---------- */
   #toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:300;max-width:420px}
-  .toast{padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--border);background:#16223c;color:var(--text);box-shadow:0 10px 28px rgba(0,0,0,.5);animation:tin .16s ease-out}
+  .toast{padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--border);background:var(--panel);color:var(--text);box-shadow:0 10px 28px rgba(0,0,0,.5);animation:tin .16s ease-out}
   .toast.ok{border-color:rgba(45,212,167,.55)} .toast.err{border-color:rgba(244,113,110,.6)} .toast.warn{border-color:rgba(245,184,92,.6)}
   @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
@@ -178,8 +205,8 @@
   .cfm-body .warnline{color:var(--amber);margin-top:8px}
   .cfm-body .mono{font-family:Consolas,'Courier New',monospace;font-size:11.5px;color:var(--green);white-space:pre-wrap;word-break:break-all;line-height:1.5;padding-left:8px;border-left:2px solid var(--border)}
   .cfm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
-  button.dangerous{background:#7a2b2f;border-color:#a3383d;color:#ffe3e2}
-  button.dangerous:hover{background:#8f3237;border-color:var(--red)}
+  button.dangerous{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-ink)}
+  button.dangerous:hover{background:var(--danger-bg-hover);border-color:var(--red)}
 
   /* ---------- 配置预览 ---------- */
   .confpre{max-height:64vh;overflow:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,'Courier New',monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-all;margin:0}
@@ -197,8 +224,8 @@
   .search::before{content:"⌕";position:absolute;left:9px;top:4px;color:var(--muted);font-size:14px;pointer-events:none}
 
   ::-webkit-scrollbar{width:9px;height:9px}
-  ::-webkit-scrollbar-thumb{background:#2a3a5e;border-radius:4px}
-  ::-webkit-scrollbar-thumb:hover{background:#3a4b6e}
+  ::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover)}
   ::-webkit-scrollbar-track{background:transparent}
 
   @media (max-width:1240px){
@@ -212,6 +239,7 @@
     .tbl{min-width:720px}
   }
 </style>
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('exabgp_theme')||'dark');}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
@@ -222,6 +250,7 @@
     </div>
     <span class="spacer"></span>
     <div class="search"><input id="globalSearch" placeholder="搜索 组名 / IP / 前缀 / URL"></div>
+    <button id="btnTheme" class="sm" title="切换深色/浅色主题">☀</button>
     <button id="btnConf" class="sm" title="查看 exabgp.conf 与配置漂移">配置</button>
     <button id="btnAudit" class="sm" title="查看操作审计">审计</button>
     <button id="btnToken" class="sm" title="设置访问令牌">🔑</button>
@@ -1562,6 +1591,14 @@
     }catch(e){ toast("读取配置失败："+e.message,"err"); }
   }
 
+  // ---------- 深色 / 浅色主题 ----------
+  const THEME_KEY = "exabgp_theme";
+  function applyTheme(t){
+    document.documentElement.setAttribute("data-theme", t==="light" ? "light" : "dark");
+    const b=$("btnTheme"); if(b) b.textContent = (t==="light" ? "🌙" : "☀");
+    try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
+  }
+
   // ---------- 操作审计 ----------
   let AUDIT_ITEMS=[];
   async function loadAudit(){
@@ -1626,6 +1663,11 @@
 
   // 全局搜索
   // 审计 / 令牌
+  $("btnTheme").onclick=function(){
+    const cur=document.documentElement.getAttribute("data-theme")==="light" ? "dark" : "light";
+    applyTheme(cur);
+  };
+  applyTheme(document.documentElement.getAttribute("data-theme") || "dark");
   $("btnConf").onclick=loadConf;
   $("confClose").onclick=function(){ $("confModal").classList.add("hidden"); };
   $("confReload").onclick=loadConf;
