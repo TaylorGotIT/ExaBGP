@@ -23,6 +23,30 @@
 | POST | `/bulk/announce` | 手动发布 |
 | POST | `/bulk/withdraw` | 手动撤回 |
 | GET | `/api/logs` | SSE 实时日志 |
+| GET | `/api/audit?limit=200&q=` | 操作审计记录（新→旧，可按关键字过滤） |
+
+## 鉴权（可选）
+
+服务端设置 `API_TOKEN` 后，除 `/`、`/index.html`、`/health` 外的接口都需要令牌：
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:9550/api/status
+curl "http://127.0.0.1:9550/api/logs?token=$TOKEN"      # SSE 用查询参数
+```
+
+- 未提供 / 不匹配 → `401 {"status":"error","msg":"需要访问令牌…"}`
+- `VIEWER_TOKEN` 命中的令牌只读：`POST` 返回 `403`
+- 未设置 `API_TOKEN` 时不鉴权（默认，兼容旧部署）
+
+## 操作审计
+
+所有 `POST` 请求都会追加一条 JSONL 到 `/exabgp/data/audit/audit-YYYY-MM-DD.jsonl`：
+
+```json
+{"t":"2026-11-08 01:08:49","actor":"operator","ip":"192.168.75.93",
+ "action":"/api/groups#update","target":"60001A","result":"ok",
+ "detail":{"action":"update","id":"g2","name":"60001A","med":"100"}}
+```
 
 ---
 

@@ -111,6 +111,87 @@ def _write_disk_log(item):
     except Exception:
         pass
 
+# ============ 访问令牌 / 角色（未配置 API_TOKEN 时不启用鉴权） ============
+API_TOKEN = os.environ.get("API_TOKEN", "").strip()
+VIEWER_TOKEN = os.environ.get("VIEWER_TOKEN", "").strip()
+
+# ============ 操作审计（JSONL，按天滚动） ============
+AUDIT_DIR = os.path.join(PERSIST_DIR, "audit")
+_AUDIT_LOCK = threading.Lock()
+
+def audit(action, target="", detail=None, result="ok", actor="system", ip=""):
+    rec = {
+        "t": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "actor": actor or "system", "ip": ip or "",
+        "action": action, "target": target or "",
+        "result": result, "detail": detail or {},
+    }
+    try:
+        os.makedirs(AUDIT_DIR, exist_ok=True)
+        path = os.path.join(AUDIT_DIR, "audit-" + time.strftime("%Y-%m-%d") + ".jsonl")
+        with _AUDIT_LOCK, open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+def read_audit(limit=200, keyword=""):
+    """读取最近审计记录（新→旧）；跨天文件自动覆盖"""
+    items = []
+    try:
+        if os.path.isdir(AUDIT_DIR):
+            files = sorted([f for f in os.listdir(AUDIT_DIR) if f.startswith("audit-")], reverse=True)
+            for fn in files:
+                with open(os.path.join(AUDIT_DIR, fn), "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            try:
+                                items.append(json.loads(line))
+                            except Exception:
+                                pass
+                if len(items) >= limit * 3:
+                    break
+    except Exception:
+        pass
+    if keyword:
+        k = keyword.lower()
+        items = [x for x in items if k in json.dumps(x, ensure_ascii=False).lower()]
+    items.reverse()
+    return items[:limit]
+
+# ============ 告警 webhook（钉钉 / 企微 / Slack） ============
+ALERT_WEBHOOK = os.environ.get("ALERT_WEBHOOK", "").strip()
+ALERT_KIND = os.environ.get("ALERT_KIND", "dingtalk").strip().lower()   # dingtalk | wecom | slack
+ALERT_INTERVAL = int(os.environ.get("ALERT_INTERVAL", "300"))           # 同一 key 的去重窗口（秒）
+_ALERT_SENT = {}
+
+def _post_json(url, payload):
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=8).read()
+    except Exception:
+        pass
+
+def alert(key, text):
+    """发送告警；同一 key 在 ALERT_INTERVAL 内只发一次，避免告警风暴"""
+    if not ALERT_WEBHOOK:
+        return
+    now = time.time()
+    if now - _ALERT_SENT.get(key, 0) < ALERT_INTERVAL:
+        return
+    _ALERT_SENT[key] = now
+    if ALERT_KIND == "slack":
+        payload = {"text": "[ExaBGP] " + text}
+    else:  # 钉钉 / 企业微信 文本消息结构相同
+        payload = {"msgtype": "text", "text": {"content": "[ExaBGP] " + text}}
+    threading.Thread(target=_post_json, args=(ALERT_WEBHOOK, payload), daemon=True).start()
+
+def on_neighbor_change(ip, old, st, reason=""):
+    msg = f"邻居 {ip}: {old} → {st}" + (f"（{reason}）" if reason else "")
+    log("🔔 " + msg)
+    alert("neighbor:" + ip, "BGP 邻居状态变化 — " + msg)
+
 def _clean_old_logs():
     """清理超过 LOG_RETENTION_DAYS 天的日志文件（启动时 + 跨天时调用）"""
     try:
@@ -166,7 +247,7 @@ def handle_output_line(line):
         st0["state"] = st
         st0["updated"] = time.time()
         if old and old != st:
-            log(f"🔔 邻居 {ip}: {old} → {st}")
+            on_neighbor_change(ip, old, st)
         return
     # exabgp neighbor-changes 事件（conf 邻居块 api{neighbor-changes} 推送）：neighbor <ip> up / down - <reason>
     m = re.match(r"^neighbor (\S+) (up|down)(?: - (.*))?$", line)
@@ -178,7 +259,7 @@ def handle_output_line(line):
         st0["state"] = st
         st0["updated"] = time.time()
         if old and old != st:
-            log(f"🔔 邻居 {ip}: {old} → {st}" + (f"（{reason}）" if reason else ""))
+            on_neighbor_change(ip, old, st, reason)
         return
     m = re.match(r"^neighbor (\S+) (Established|Idle|Active|Connect|OpenSent|OpenConfirm|Down)\s*$", line)
     if m:
@@ -188,7 +269,7 @@ def handle_output_line(line):
         st0["state"] = st
         st0["updated"] = time.time()
         if old and old != st:
-            log(f"🔔 邻居 {ip}: {old} → {st}")
+            on_neighbor_change(ip, old, st)
         return
     # exabgp `show adj-rib out` text 输出行：<ip> ipv4 unicast <prefix>
     m = re.match(r"^(\d+\.\d+\.\d+\.\d+)\s+(?:ipv4|ipv6) unicast\s+(\S+)\s*$", line)
@@ -607,6 +688,7 @@ async def source_refresh_job(sid):
         s["last_status"] = "下载失败"; s["last_time"] = LAST_REFRESH_TIME
         LAST_REFRESH_STATUS = f"源[{s['name']}] 下载失败（熔断，保留旧路由）"
         log(f"❌ [源:{s['name']}] 下载失败: {e}（熔断跳过，维持旧路由）")
+        alert("source:" + s["id"], f"数据源[{s['name']}]抓取失败：{e}")
         sse_broadcast_status()
         return
     if not latest:
@@ -738,7 +820,77 @@ async def withdraw_all_from_group(gid):
     sse_broadcast_status()
 
 # ============ HTTP 接口 ============
-class IndexHandler(tornado.web.RequestHandler):
+class BaseHandler(tornado.web.RequestHandler):
+    """统一鉴权 + 写操作审计。
+
+    - 未配置 API_TOKEN 时保持开放（与旧版本行为一致）
+    - 配置后：Authorization: Bearer <token> 或 ?token=<token>
+      VIEWER_TOKEN 匹配时为只读角色，所有写操作返回 403
+    """
+
+    def prepare(self):
+        self.role = "operator"
+        if self.request.path in ("/", "/index.html", "/health"):
+            return          # 页面本身与健康检查不要求令牌
+        if not API_TOKEN:
+            return
+        token = self._request_token()
+        if token and token == API_TOKEN:
+            self.role = "operator"
+        elif token and VIEWER_TOKEN and token == VIEWER_TOKEN:
+            self.role = "viewer"
+        else:
+            self.set_status(401)
+            self.set_header("Content-Type", "application/json; charset=UTF-8")
+            self.finish(json.dumps({"status": "error",
+                                    "msg": "需要访问令牌：Authorization: Bearer <token> 或 ?token=<token>"},
+                                   ensure_ascii=False))
+            return
+        if self.role == "viewer" and self.request.method not in ("GET", "HEAD"):
+            self.set_status(403)
+            self.set_header("Content-Type", "application/json; charset=UTF-8")
+            self.finish(json.dumps({"status": "error", "msg": "只读令牌不允许执行写操作"}, ensure_ascii=False))
+
+    def _request_token(self):
+        h = self.request.headers.get("Authorization", "")
+        if h.lower().startswith("bearer "):
+            return h[7:].strip()
+        return self.get_argument("token", "").strip()
+
+    def on_finish(self):
+        """写操作留痕：路径 + action + 目标 + 关键参数 + 结果"""
+        if self.request.method != "POST":
+            return
+        try:
+            body = json.loads(self.request.body or b"{}")
+        except Exception:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        detail = {}
+        for k in ("action", "id", "name", "url", "next_hop", "community", "med", "prepend",
+                  "group", "neighbor", "interval", "enabled", "prefix", "old_prefix", "new_prefix"):
+            if k in body:
+                detail[k] = body[k]
+        for k, label in (("routes", "routes"), ("route_groups", "route_groups")):
+            if isinstance(body.get(k), list):
+                detail[label] = len(body[k])
+        if isinstance(body.get("prefixes"), str):
+            detail["prefixes_lines"] = len([x for x in body["prefixes"].split("\n") if x.strip()])
+        try:
+            status = self.get_status()
+        except Exception:
+            status = 200
+        audit(
+            action=self.request.path + ("#" + str(body.get("action")) if body.get("action") else ""),
+            target=str(body.get("name") or body.get("id") or body.get("neighbor") or ""),
+            detail=detail,
+            result="ok" if status < 400 else "error",
+            actor=getattr(self, "role", "anonymous"),
+            ip=self.request.remote_ip,
+        )
+
+class IndexHandler(BaseHandler):
     def get(self):
         # 控制台页面随版本变化，禁止浏览器缓存（否则升级后仍显示旧界面）
         self.set_header("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -746,11 +898,11 @@ class IndexHandler(tornado.web.RequestHandler):
         self.set_header("Expires", "0")
         self.render("index.html")
 
-class StatusApiHandler(tornado.web.RequestHandler):
+class StatusApiHandler(BaseHandler):
     async def get(self):
         self.write(status_payload())
 
-class SourcesApiHandler(tornado.web.RequestHandler):
+class SourcesApiHandler(BaseHandler):
     """数据源管理：add / update / delete / refresh，修改立即生效"""
     async def post(self):
         try:
@@ -817,7 +969,7 @@ class SourcesApiHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class GroupsApiHandler(tornado.web.RequestHandler):
+class GroupsApiHandler(BaseHandler):
     """分组管理：add / update / delete，邻居IP/下一跳/属性可自定义；组名约定 客户ID+站点号+线路序号"""
     async def post(self):
         try:
@@ -934,7 +1086,7 @@ async def _delete_group(gid):
     log(f"🗑️ 分组 [{name}] 已删除")
     sse_broadcast_status()
 
-class RouteGroupsApiHandler(tornado.web.RequestHandler):
+class RouteGroupsApiHandler(BaseHandler):
     """IP 路由组管理：add / update / delete；前缀可手动粘贴或从 URL 拉取；可带覆盖下一跳/属性"""
     async def post(self):
         try:
@@ -1062,7 +1214,7 @@ class RouteGroupsApiHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class RouteGroupDetailHandler(tornado.web.RequestHandler):
+class RouteGroupDetailHandler(BaseHandler):
     """路由组详情：返回完整前缀列表（几百条级别，供下拉/列表管理）"""
     async def get(self, rgid):
         rg = ROUTE_GROUPS.get(rgid)
@@ -1118,7 +1270,7 @@ def expand_withdraw_routes(data):
     routes.extend(data.get("routes") or [])
     return routes
 
-class BulkAnnounceHandler(tornado.web.RequestHandler):
+class BulkAnnounceHandler(BaseHandler):
     async def post(self):
         try:
             data = json.loads(self.request.body)
@@ -1148,7 +1300,7 @@ class BulkAnnounceHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class BulkWithdrawHandler(tornado.web.RequestHandler):
+class BulkWithdrawHandler(BaseHandler):
     async def post(self):
         try:
             data = json.loads(self.request.body)
@@ -1170,12 +1322,12 @@ class BulkWithdrawHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class ForceRefreshHandler(tornado.web.RequestHandler):
+class ForceRefreshHandler(BaseHandler):
     async def post(self):
         tornado.ioloop.IOLoop.current().add_callback(_refresh_all_coro)
         self.write({"status": "ok", "msg": "全部数据源刷新已触发。"})
 
-class ConfApiHandler(tornado.web.RequestHandler):
+class ConfApiHandler(BaseHandler):
     """预览/校验自动生成的 exabgp.conf（每次按当前配置实时渲染）"""
     async def get(self):
         try:
@@ -1186,7 +1338,7 @@ class ConfApiHandler(tornado.web.RequestHandler):
         self.set_header("Content-Type", "text/plain; charset=utf-8")
         self.write(text)
 
-class ControlHandler(tornado.web.RequestHandler):
+class ControlHandler(BaseHandler):
     """运行时控制：向 exabgp 下发 show adj-rib-out / show route / show neighbor / teardown 命令"""
     async def post(self):
         try:
@@ -1219,7 +1371,7 @@ class ControlHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class NeighborsHandler(tornado.web.RequestHandler):
+class NeighborsHandler(BaseHandler):
     """监控联动：邻居状态表（state / adj-rib-out / 更新时间）"""
     async def get(self):
         now = time.time()
@@ -1235,12 +1387,12 @@ class NeighborsHandler(tornado.web.RequestHandler):
         self.write({"status": "ok", "neighbors": out, "monitored": sorted(set(
             n for g in GROUPS.values() if g["enabled"] for n in g["neighbors"]))})
 
-class ResponsesHandler(tornado.web.RequestHandler):
+class ResponsesHandler(BaseHandler):
     """运行时命令响应回显（最新在前，最多 200 条）"""
     async def get(self):
         self.write({"status": "ok", "responses": list(reversed(list(RESPONSES)))})
 
-class MonitorConfigHandler(tornado.web.RequestHandler):
+class MonitorConfigHandler(BaseHandler):
     """邻居监控轮询频率（默认 30s，可运行时修改，范围 5~3600s）"""
     async def get(self):
         self.write({"status": "ok", "interval": NEIGHBOR_POLL_INTERVAL})
@@ -1259,7 +1411,7 @@ class MonitorConfigHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class AdjRibHandler(tornado.web.RequestHandler):
+class AdjRibHandler(BaseHandler):
     """指定前缀是否在邻居已发布列表（show adj-rib out 全量快照中精确匹配）"""
     async def get(self):
         try:
@@ -1276,14 +1428,24 @@ class AdjRibHandler(tornado.web.RequestHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
-class HealthHandler(tornado.web.RequestHandler):
+class AuditHandler(BaseHandler):
+    async def get(self):
+        try:
+            limit = int(self.get_argument("limit", "200"))
+        except ValueError:
+            limit = 200
+        limit = max(1, min(1000, limit))
+        kw = self.get_argument("q", "").strip()
+        self.write({"status": "ok", "items": read_audit(limit=limit, keyword=kw)})
+
+class HealthHandler(BaseHandler):
     async def get(self):
         self.write({"status": "running", "service": "exabgp-http-api", "cached_routes_count": len(union_routes())})
 
 # --------------------------------------------------
 # 🔴 SSE 实时日志流接口（text/event-stream）
 # --------------------------------------------------
-class LogStreamHandler(tornado.web.RequestHandler):
+class LogStreamHandler(BaseHandler):
     async def get(self):
         self.set_header("Content-Type", "text/event-stream")
         self.set_header("Cache-Control", "no-cache")
@@ -1328,6 +1490,7 @@ def make_app():
         (r"/api/responses", ResponsesHandler),
         (r"/api/monitor_config", MonitorConfigHandler),
         (r"/api/adjrib", AdjRibHandler),
+        (r"/api/audit", AuditHandler),
         (r"/health", HealthHandler),
         (r"/bulk/announce", BulkAnnounceHandler),
         (r"/bulk/withdraw", BulkWithdrawHandler),

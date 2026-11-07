@@ -215,6 +215,8 @@
     </div>
     <span class="spacer"></span>
     <div class="search"><input id="globalSearch" placeholder="搜索 组名 / IP / 前缀 / URL"></div>
+    <button id="btnAudit" class="sm" title="查看操作审计">审计</button>
+    <button id="btnToken" class="sm" title="设置访问令牌">🔑</button>
     <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
     <button id="btnRefresh" class="primary">立即刷新全部数据源</button>
   </header>
@@ -433,6 +435,42 @@
       </div>
     </div>
   </div>
+
+  <div id="auditModal" class="modal hidden">
+    <div class="modal-box" style="width:min(1000px,96vw)">
+      <div class="modal-head">
+        <span class="t">操作审计</span>
+        <button id="auditClose" class="sm">✕ 关闭</button>
+      </div>
+      <div class="rg-tool">
+        <input id="auditFilter" placeholder="按 操作者 / 动作 / 目标 过滤…">
+        <button id="auditRefresh" class="sm">刷新</button>
+        <span class="status-text" id="auditCount"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:62vh;overflow:auto">
+        <table class="tbl" style="min-width:820px">
+          <colgroup><col style="width:150px"><col style="width:90px"><col style="width:130px"><col><col style="width:90px"></colgroup>
+          <thead><tr><th>时间</th><th>操作者</th><th>来源 IP</th><th>动作 / 目标</th><th class="ctr">结果</th></tr></thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tokenModal" class="modal hidden">
+    <div class="modal-box sm">
+      <div class="modal-head"><span class="t">访问令牌</span></div>
+      <div class="cfm-body">
+        <div>服务端启用了访问令牌，请输入后继续（仅保存在本浏览器 localStorage）。</div>
+        <div class="mini-label" style="margin-top:8px">只读令牌可以查看但不能修改。</div>
+      </div>
+      <div style="margin-top:12px"><input id="tokenInput" placeholder="粘贴 token" autocomplete="off"></div>
+      <div class="cfm-actions">
+        <button id="tokenClear">清除</button>
+        <button id="tokenSave" class="primary">保存并重试</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="toasts"></div>
@@ -450,6 +488,33 @@
   const SORT={src:null,grp:null,rg:null};   // {key,dir}
   let LAST_STATUS=null, LAST_NEIGHBORS=null, SSE_OK=false;
   let CACHED_COUNT=0;
+
+  // ---------- 访问令牌（服务端配置 API_TOKEN 时才需要） ----------
+  const TOKEN_KEY = "exabgp_token";
+  let TOKEN = localStorage.getItem(TOKEN_KEY) || "";
+  let tokenPrompted = false;
+  function api(u){
+    if(!TOKEN) return u;
+    return u + (u.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(TOKEN);
+  }
+  function needToken(){
+    if(tokenPrompted) return;
+    tokenPrompted = true;
+    $("tokenModal").classList.remove("hidden");
+    $("tokenInput").value = TOKEN;
+    setTimeout(function(){ $("tokenInput").focus(); }, 50);
+  }
+  // 统一拦截 401/403：弹令牌框 / 只读提示
+  (function(){
+    const _f = window.fetch.bind(window);
+    window.fetch = function(u, o){
+      return _f(u, o).then(function(r){
+        if(r.status === 401){ needToken(); }
+        else if(r.status === 403){ toast("只读令牌：不允许执行写操作", "err"); }
+        return r;
+      });
+    };
+  })();
 
   function toast(msg, type){
     const box=$("toasts"); if(!box)return;
@@ -983,7 +1048,7 @@
 
   // ---------- 通用 ----------
   function post(url,data){
-    return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+    return fetch(api(url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
       .then(function(r){return r.json();})
       .then(function(j){
         if(j.status!=="ok"){
@@ -998,7 +1063,7 @@
   }
 
   function loadStatus(){
-    fetch("/api/status").then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/status")).then(function(r){return r.json();}).then(function(d){
       LAST_STATUS=d;
       CACHED_COUNT=d.cached_count||0;
       SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
@@ -1189,7 +1254,7 @@
     });
   }
   function loadNeighbors(){
-    fetch("/api/neighbors").then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/neighbors")).then(function(r){return r.json();}).then(function(d){
       if(d.status==="error")return;
       LAST_NEIGHBORS=d;
       updateAlerts();
@@ -1217,7 +1282,7 @@
     if(j) toast("已向 "+ip+" 发送 teardown","ok");
   }
   function loadMonitorConfig(){
-    fetch("/api/monitor_config").then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/monitor_config")).then(function(r){return r.json();}).then(function(d){
       if(d.status==="ok")$("monitorInterval").value=d.interval;
     }).catch(function(){});
   }
@@ -1231,7 +1296,7 @@
     const p=qi.value.trim();
     if(!p){appendLog("⚠️ 请输入要查询的前缀（如 8.221.128.0/20）");return;}
     PREFIX_INPUT[ip]=p;
-    fetch("/api/adjrib?ip="+encodeURIComponent(ip)+"&prefix="+encodeURIComponent(p)).then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/adjrib?ip="+encodeURIComponent(ip)+"&prefix="+encodeURIComponent(p))).then(function(r){return r.json();}).then(function(d){
       if(d.status==="error"){appendLog("❌ "+(d.msg||"查询失败"));return;}
       const text=d.found
         ? "✅ "+d.prefix+" 已在发布列表（共 "+d.count+" 条）"
@@ -1243,7 +1308,7 @@
     }).catch(function(e){appendLog("❌ 查询失败: "+e.message);});
   }
   function loadResponses(){
-    fetch("/api/responses").then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/responses")).then(function(r){return r.json();}).then(function(d){
       RESP_ALL=(d.responses||[]);
       renderNeighborResp();
     }).catch(function(){});
@@ -1261,7 +1326,7 @@
   function loadRgPrefixes(){
     const id=$("rgLoadSel").value;
     if(!id){appendLog("⚠️ 请先选择路由组");return;}
-    fetch("/api/routegroups/"+id).then(function(r){return r.json();}).then(function(d){
+    fetch(api("/api/routegroups/"+id)).then(function(r){return r.json();}).then(function(d){
       if(d.status==="error"){appendLog("❌ "+d.msg);return;}
       $("manualRoutes").value=(d.prefixes||[]).join("\n");
       appendLog("📥 已载入路由组 ["+d.name+"] "+d.prefixes_count+" 条前缀到输入框");
@@ -1271,7 +1336,7 @@
   // ---------- 路由组前缀列表弹窗（增删查改） ----------
   let curRg=null, curRgData={prefixes:[]};
   function refreshRgDetail(){
-    return fetch("/api/routegroups/"+curRg).then(function(r){return r.json();});
+    return fetch(api("/api/routegroups/"+curRg)).then(function(r){return r.json();});
   }
   function renderRgList(){
     const all=curRgData.prefixes||[];
@@ -1341,6 +1406,33 @@
     post("/api/routegroups",{action:"update_prefix",id:curRg,old_prefix:oldp,new_prefix:newp}).then(afterRgChange);
   }
 
+  // ---------- 操作审计 ----------
+  async function loadAudit(){
+    const q = $("auditFilter").value.trim();
+    try{
+      const r = await fetch(api("/api/audit?limit=200" + (q ? "&q=" + encodeURIComponent(q) : "")));
+      if(r.status === 401){ needToken(); return; }
+      const d = await r.json();
+      const items = d.items || [];
+      $("auditCount").textContent = "共 " + items.length + " 条";
+      const body = $("auditBody"); body.innerHTML = "";
+      if(!items.length){ body.appendChild(emptyRow(5, q ? "没有匹配的审计记录" : "暂无审计记录")); return; }
+      items.forEach(function(it){
+        const tr = el("tr");
+        tr.appendChild(cell(null, it.t || ""));
+        tr.appendChild(cell(null, it.actor || ""));
+        tr.appendChild(cell(null, it.ip || ""));
+        const c = cell(null, (it.action || "") + (it.target ? "  ·  " + it.target : ""));
+        c.title = JSON.stringify(it.detail || {});
+        tr.appendChild(c);
+        const cs = cell("ctr");
+        cs.appendChild(el("span", "st " + (it.result === "ok" ? "est" : "bad"), it.result === "ok" ? "成功" : "失败"));
+        tr.appendChild(cs);
+        body.appendChild(tr);
+      });
+    }catch(e){ toast("读取审计失败：" + e.message, "err"); }
+  }
+
   // ---------- 绑定 ----------
   $("btnAnnounce").onclick=function(){manual("announce",this);};
   $("btnWithdraw").onclick=function(){manual("withdraw",this);};
@@ -1375,6 +1467,26 @@
   });
 
   // 全局搜索
+  // 审计 / 令牌
+  $("btnAudit").onclick=function(){ $("auditModal").classList.remove("hidden"); loadAudit(); };
+  $("auditClose").onclick=function(){ $("auditModal").classList.add("hidden"); };
+  $("auditRefresh").onclick=loadAudit;
+  let auditTimer=null;
+  $("auditFilter").addEventListener("input",function(){ clearTimeout(auditTimer); auditTimer=setTimeout(loadAudit,300); });
+  $("btnToken").onclick=function(){ $("tokenModal").classList.remove("hidden"); $("tokenInput").value=TOKEN; $("tokenInput").focus(); };
+  $("tokenSave").onclick=function(){
+    TOKEN=$("tokenInput").value.trim();
+    if(TOKEN) localStorage.setItem(TOKEN_KEY,TOKEN); else localStorage.removeItem(TOKEN_KEY);
+    $("tokenModal").classList.add("hidden");
+    tokenPrompted=false;
+    initSSE(); loadStatus();
+    toast("令牌已保存，正在重新加载","ok");
+  };
+  $("tokenClear").onclick=function(){
+    TOKEN=""; localStorage.removeItem(TOKEN_KEY); $("tokenInput").value="";
+    toast("已清除本地令牌","ok");
+  };
+
   $("globalSearch").addEventListener("input",function(){
     SEARCH=this.value;
     if(!isEditing()){ renderSources(); renderGroups(); renderRouteGroups(); }
@@ -1385,20 +1497,25 @@
 
   // ---------- SSE ----------
   const dot=$("sseDot"), txt=$("sseTxt");
-  const es=new EventSource("/api/logs");
-  es.onopen=function(){ SSE_OK=true; dot.className="dot"; txt.textContent="SSE 已连接"; updateAlerts(); };
-  es.onerror=function(){ SSE_OK=false; dot.className="dot off"; txt.textContent="SSE 断开，重连中…"; updateAlerts(); };
-  es.onmessage=function(ev){
-    let d; try{d=JSON.parse(ev.data);}catch(e){return;}
-    if(d.type==="log"){appendLog(d.message, d.tag);}
-    else if(d.type==="status"){
-      LAST_STATUS=d; CACHED_COUNT=d.cached_count||0;
-      renderKpi(d);
-      SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
-      if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
-      updateAlerts();
-    }
-  };
+  let es=null;
+  function initSSE(){
+    if(es){ try{ es.close(); }catch(e){} }
+    es=new EventSource(api("/api/logs"));
+    es.onopen=function(){ SSE_OK=true; dot.className="dot"; txt.textContent="SSE 已连接"; updateAlerts(); };
+    es.onerror=function(){ SSE_OK=false; dot.className="dot off"; txt.textContent="SSE 断开，重连中…"; updateAlerts(); };
+    es.onmessage=function(ev){
+      let d; try{d=JSON.parse(ev.data);}catch(e){return;}
+      if(d.type==="log"){appendLog(d.message, d.tag);}
+      else if(d.type==="status"){
+        LAST_STATUS=d; CACHED_COUNT=d.cached_count||0;
+        renderKpi(d);
+        SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
+        if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+        updateAlerts();
+      }
+    };
+  }
+  initSSE();
 
   loadStatus();
   setInterval(loadStatus,10000);   // 轮询兜底
