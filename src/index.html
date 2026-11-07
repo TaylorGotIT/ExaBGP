@@ -425,37 +425,18 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
         </tfoot>
       </table>
     </div>
+    <div class="panel-body" style="border-top:1px solid var(--border)">
+      <div class="sub-head">下发记录 <span class="hint" style="font-weight:400">路由组发布 / 撤回的明细回显</span></div>
+      <div id="bulkHistory" class="stack"></div>
+    </div>
   </section>
 
     <div class="split">
-    <section class="panel">
-      <div class="panel-head"><h2>手动发布 / 撤回</h2></div>
-      <div class="panel-body">
-        <div class="formgrid">
-          <label for="grpSel">目标分组</label>
-          <select id="grpSel"></select>
-          <label for="rgLoadSel">路由组载入</label>
-          <div class="inline-row">
-            <select id="rgLoadSel"></select>
-            <button id="btnRgLoad" class="sm">载入前缀</button>
-          </div>
-          <label for="manualRoutes" class="top">路由前缀</label>
-          <textarea id="manualRoutes" rows="4" placeholder="每行一个，如&#10;192.0.2.0/24&#10;198.18.0.0/15"></textarea>
-        </div>
-        <div class="toolbar">
-          <button id="btnAnnounce" class="primary">发布</button>
-          <button id="btnWithdraw">撤回</button>
-        </div>
-        <div class="sub-head">下发记录 <span class="hint" style="font-weight:400">每次手动发布 / 撤回的明细回显</span></div>
-        <div id="bulkHistory" class="stack"></div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h2>运行时参数快照</h2></div>
-      <div class="panel-body"><div id="cfgSnap"><div class="mini-label">加载中…</div></div></div>
-    </section>
-  </div>
+      <section class="panel">
+        <div class="panel-head"><h2>运行时参数快照</h2></div>
+        <div class="panel-body"><div id="cfgSnap"><div class="mini-label">加载中…</div></div></div>
+      </section>
+    </div>
 
   <div id="rgModal" class="modal hidden">
     <div class="modal-box">
@@ -927,7 +908,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
         sel.appendChild(o);
       });
     };
-    opts($("grpSel")); opts($("rgTarget"));
+    opts($("rgTarget"));
   }
 
   // ---------- 行内读取 / 保存 ----------
@@ -1107,7 +1088,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       body.appendChild(tr);
     });
     fillGroupSelects();
-    fillRgLoad();
   }
   function saveRouteGroup(rg,tr,btn){
     return busy(btn,function(){return post("/api/routegroups",Object.assign({action:"update",id:rg.id},readRow(tr)));})
@@ -1233,7 +1213,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const box=$("bulkHistory");
     box.insertBefore(card, box.firstChild);
     while(box.children.length>30){box.removeChild(box.lastChild);}
-    appendLog("✅ "+(act==="announce"?"手动发布":"手动撤回")+" "+j.count+" 条完成，明细已回显");
+    appendLog("✅ "+(act==="announce"?"发布":"撤回")+" "+j.count+" 条完成，明细已回显");
   }
 
   // 下发预览：先 dry-run 拿到命令，再让运维确认
@@ -1333,49 +1313,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     cell.innerHTML="";
     ADD_GROUPS = groupPicker(cur ? cur.split(",").filter(Boolean) : []);
     cell.appendChild(ADD_GROUPS.wrap);
-  }
-
-  // ---------- 手动发布/撤回 ----------
-  async function manual(act,btn){
-    const pre=precheckPrefixes($("manualRoutes").value);
-    if(!pre.total){appendLog("⚠️ 请先输入路由前缀");toast("请先输入路由前缀","warn");return;}
-    if(!pre.valid.length){
-      await askConfirm({title:"前缀预检失败",lines:[
-        {text:"输入 "+pre.total+" 行，没有一条是合法 IPv4 CIDR。",warn:true},
-        {text:"示例：192.0.2.0/24",mono:true}
-      ],okText:"知道了"});
-      return;
-    }
-    if(pre.invalid.length || pre.dup.length){
-      const lines=["输入 "+pre.total+" 行：合法 "+pre.valid.length+"，非法 "+pre.invalid.length+"，重复 "+pre.dup.length+"。"];
-      pre.invalid.slice(0,8).forEach(function(x){lines.push({text:"✗ "+x,mono:true});});
-      pre.dup.slice(0,5).forEach(function(x){lines.push({text:"↺ "+x+"（重复）",mono:true});});
-      lines.push({text:"将只提交合法的 "+pre.valid.length+" 条。",warn:true});
-      const go=await askConfirm({title:"前缀预检",lines:lines,okText:"仅提交合法项"});
-      if(!go)return;
-    }
-    const routes=pre.valid;
-    if(act==="withdraw"){
-      const g=$("grpSel").options[$("grpSel").selectedIndex].textContent;
-      const ok=await askConfirm({
-        title:"撤回路由",
-        lines:[
-          "目标分组："+g,
-          "将撤回 "+routes.length+" 条前缀。",
-          {text:"撤回后 CE 侧这些前缀会消失，可能影响业务流量。",warn:true}
-        ],
-        okText:"撤回"
-      });
-      if(!ok)return;
-    }
-    const body={group:$("grpSel").value,routes:routes};
-    if(act==="announce"){
-      const ok=await previewAnnounce(body,"手动发布 "+routes.length+" 条前缀");
-      if(!ok)return;
-    }
-    const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
-    const j=await busy(btn,function(){return post(url,body);});
-    if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+routes.length+" 条前缀","ok"); }
   }
 
   // ---------- 路由组发布/撤回 ----------
@@ -1575,25 +1512,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     }).catch(function(){});
   }
 
-  // ---------- 路由组下拉快捷载入 ----------
-  function fillRgLoad(){
-    const sel=$("rgLoadSel");
-    sel.innerHTML="";
-    const o0=el("option"); o0.value=""; o0.textContent="选择路由组…"; sel.appendChild(o0);
-    ROUTEGROUPS.forEach(function(rg){
-      const o=el("option"); o.value=rg.id; o.textContent=rg.name+"（"+rg.prefixes_count+" 条）"; sel.appendChild(o);
-    });
-  }
-  function loadRgPrefixes(){
-    const id=$("rgLoadSel").value;
-    if(!id){appendLog("⚠️ 请先选择路由组");return;}
-    fetch(api("/api/routegroups/"+id)).then(function(r){return r.json();}).then(function(d){
-      if(d.status==="error"){appendLog("❌ "+d.msg);return;}
-      $("manualRoutes").value=(d.prefixes||[]).join("\n");
-      appendLog("📥 已载入路由组 ["+d.name+"] "+d.prefixes_count+" 条前缀到输入框");
-    }).catch(function(e){appendLog("❌ 载入失败: "+e.message);});
-  }
-
   // ---------- 路由组前缀列表弹窗（增删查改） ----------
   let curRg=null, curRgData={prefixes:[]};
   function refreshRgDetail(){
@@ -1745,11 +1663,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   }
 
   // ---------- 绑定 ----------
-  $("btnAnnounce").onclick=function(){manual("announce",this);};
-  $("btnWithdraw").onclick=function(){manual("withdraw",this);};
   $("btnRgAnnounce").onclick=function(){rgOps("announce",this);};
   $("btnRgWithdraw").onclick=function(){rgOps("withdraw",this);};
-  $("btnRgLoad").onclick=loadRgPrefixes;
   $("btnRefresh").onclick=function(){
     busy(this,function(){return post("/refresh",{});}).then(function(j){
       if(j){ appendLog("⚡ 已触发全部数据源立即刷新"); toast("已触发全部数据源刷新","ok"); }
