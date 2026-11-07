@@ -151,12 +151,6 @@
   .inline-row button{flex:0 0 auto}
 
   /* ---------- 快照 ---------- */
-  table.snap{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
-  table.snap td{padding:5px 0;vertical-align:top;line-height:1.6}
-  table.snap td.snap-k{width:150px;color:var(--muted);font-family:Consolas,'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px}
-  table.snap td.snap-v{color:var(--text);word-break:break-all}
-  table.snap tr.snap-head td{padding:12px 0 4px;color:var(--accent);font-weight:700;font-size:12px;border-top:1px solid var(--border)}
-  table.snap tr:first-child.snap-head td{border-top:0;padding-top:0}
 
   /* ---------- 下发记录 ---------- */
   .stack{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
@@ -430,12 +424,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     </div>
   </section>
 
-    <div class="split">
-      <section class="panel">
-        <div class="panel-head"><h2>运行时参数快照</h2></div>
-        <div class="panel-body"><div id="cfgSnap"><div class="mini-label">加载中…</div></div></div>
-      </section>
-    </div>
 
   <div id="rgModal" class="modal hidden">
     <div class="modal-box">
@@ -834,17 +822,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   }
 
   // ---------- KPI ----------
-  function snapRow(tb,label,value){
-    const tr=el("tr");
-    const a=el("td","snap-k",label); a.title=String(label);
-    const b=el("td","snap-v",value==null||value===""?"–":String(value));
-    tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr);
-  }
-  function snapHead(tb,text){
-    const tr=el("tr","snap-head");
-    const td=el("td"); td.colSpan=2; td.textContent=text;
-    tr.appendChild(td); tb.appendChild(tr);
-  }
   function renderKpi(d){
     $("kpiCount").textContent=d.cached_count==null?"–":d.cached_count;
     const st=d.last_status||"–";
@@ -858,34 +835,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     tm.textContent=d.last_time||"–"; tm.title=d.last_time||"";
     $("kpiSrcGrp").textContent=(d.sources||[]).length+" 源 / "+(d.groups||[]).length+" 组 / "+(d.routegroups||[]).length+" 路由组";
 
-    const cfg=d.config||{};
-    const snap=$("cfgSnap");
-    const table=el("table","snap");
-    const tb=el("tbody");
-    snapRow(tb,"BATCH_SIZE",cfg.BATCH_SIZE);
-    snapRow(tb,"调度周期",cfg.TICK_SECONDS+" 秒");
-    snapRow(tb,"最小间隔",cfg.MIN_INTERVAL+" 秒");
-    snapHead(tb,"分组邻居一览");
-    if((d.groups||[]).length){
-      d.groups.forEach(function(g){
-        snapRow(tb,(g.enabled?"✔ ":"✘ ")+g.name,"下一跳 "+g.next_hop+" · 属性 "+(g.community||"无")
-          +(g.med?" · MED "+g.med:"")+(g.prepend?" · prepend "+g.prepend:""));
-      });
-    }else snapRow(tb,"—","暂无分组");
-    snapHead(tb,"路由组一览");
-    if((d.routegroups||[]).length){
-      d.routegroups.forEach(function(rg){
-        const bits=[];
-        if(rg.next_hop)bits.push("覆盖下一跳 "+rg.next_hop);
-        if(rg.community)bits.push("覆盖属性 "+rg.community);
-        if(rg.med)bits.push("MED "+rg.med);
-        if(rg.prepend)bits.push("prepend "+rg.prepend);
-        snapRow(tb,rg.name+"（"+rg.prefixes_count+" 条）",bits.length?bits.join(" · "):"沿用目标组默认");
-      });
-    }else snapRow(tb,"—","暂无路由组");
-    table.appendChild(tb);
-    snap.innerHTML="";
-    snap.appendChild(table);
   }
 
   function isEditing(){
