@@ -256,13 +256,11 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       <div class="sub">多源差分 · 分组邻居传播 · IP 路由组</div>
     </div>
     <span class="spacer"></span>
-    <div class="search"><input id="globalSearch" placeholder="搜索 组名 / IP / 前缀 / URL"></div>
     <button id="btnTheme" class="sm" title="切换深色/浅色主题">☀</button>
     <button id="btnConf" class="sm" title="查看 exabgp.conf 与配置漂移">配置</button>
     <button id="btnAudit" class="sm" title="查看操作审计">审计</button>
     <button id="btnToken" class="sm" title="设置访问令牌">🔑</button>
     <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
-    <button id="btnRefresh" class="primary">立即刷新全部数据源</button>
   </header>
 
   <div id="alertBar" class="alert-bar"></div>
@@ -519,7 +517,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   function cell(cls,text){const d=el("td",cls);if(text!=null)d.textContent=text;return d;}
 
   // ---------- 全局搜索 / 排序 / 提示 / 确认 ----------
-  let SEARCH="";
   const SORT={src:null,grp:null,rg:null};   // {key,dir}
   let LAST_STATUS=null, LAST_NEIGHBORS=null, SSE_OK=false;
   let CACHED_COUNT=0;
@@ -635,12 +632,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   }
 
   // 搜索命中：q 为空或任一字段包含关键字
-  function hitQ(){
-    const q=SEARCH.trim().toLowerCase();
-    if(!q)return true;
-    const args=Array.prototype.slice.call(arguments);
-    return args.some(function(v){ return String(v==null?"":v).toLowerCase().indexOf(q)>=0; });
-  }
   function applySort(list, table, getters){
     const s=SORT[table];
     if(!s) return list;
@@ -879,9 +870,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const body=$("srcList"); body.innerHTML="";
     if(!SOURCES.length){body.appendChild(emptyRow(7,"暂无数据源，请在下方添加。"));return;}
     const rows=applySort(
-      SOURCES.filter(function(s){return hitQ(s.name,s.url,s.last_status,(s.groups||[]).join(","));}),
+      SOURCES,
       "src",{name:function(s){return s.name;},interval:function(s){return s.interval;}});
-    if(!rows.length){body.appendChild(emptyRow(7,"没有匹配「"+SEARCH+"」的数据源。"));return;}
     rows.forEach(function(s){
       const tr=el("tr");
       const nm=el("input"); nm.value=s.name; nm.dataset.k="name"; nm.title=s.name;
@@ -936,9 +926,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const body=$("grpList"); body.innerHTML="";
     if(!GROUPS.length){body.appendChild(emptyRow(8,"暂无分组，请在下方添加。"));return;}
     const rows=applySort(
-      GROUPS.filter(function(g){return hitQ(g.name,(g.neighbors||[]).join(","),g.next_hop,g.community);}),
+      GROUPS,
       "grp",{name:function(g){return g.name;}});
-    if(!rows.length){body.appendChild(emptyRow(8,"没有匹配「"+SEARCH+"」的分组。"));return;}
     rows.forEach(function(g){
       const tr=el("tr");
       const nm=el("input"); nm.value=g.name; nm.dataset.k="name"; nm.title=g.name;
@@ -1004,10 +993,9 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   function renderRouteGroups(){
     const body=$("rgList"); body.innerHTML="";
     const rows=applySort(
-      ROUTEGROUPS.filter(function(rg){return hitQ(rg.name,rg.next_hop,rg.community);}),
+      ROUTEGROUPS,
       "rg",{name:function(rg){return rg.name;},count:function(rg){return rg.prefixes_count;}});
     if(!ROUTEGROUPS.length){body.appendChild(emptyRow(8,"暂无路由组，请在下方添加。"));}
-    else if(!rows.length){body.appendChild(emptyRow(8,"没有匹配「"+SEARCH+"」的路由组。"));}
     rows.forEach(function(rg){
       const tr=el("tr");
       const ch=el("input"); ch.type="checkbox"; ch.className="chk rg-chk"; ch.dataset.id=rg.id;
@@ -1610,11 +1598,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   // ---------- 绑定 ----------
   $("btnRgAnnounce").onclick=function(){rgOps("announce",this);};
   $("btnRgWithdraw").onclick=function(){rgOps("withdraw",this);};
-  $("btnRefresh").onclick=function(){
-    busy(this,function(){return post("/refresh",{});}).then(function(j){
-      if(j){ appendLog("⚡ 已触发全部数据源立即刷新"); toast("已触发全部数据源刷新","ok"); }
-    });
-  };
   $("btnAddSrc").onclick=function(){busy(this,addSource);};
   $("btnAddGrp").onclick=function(){busy(this,addGroup);};
   $("btnAddRg").onclick=function(){busy(this,addRouteGroup);};
@@ -1694,11 +1677,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     TOKEN=""; localStorage.removeItem(TOKEN_KEY); $("tokenInput").value="";
     toast("已清除本地令牌","ok");
   };
-
-  $("globalSearch").addEventListener("input",function(){
-    SEARCH=this.value;
-    if(!isEditing()){ renderSources(); renderGroups(); renderRouteGroups(); }
-  });
 
   // 表头排序
   bindSortHeaders();
