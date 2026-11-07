@@ -312,8 +312,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
         <button id="btnClear">清空显示</button>
         <label class="inline"><input type="checkbox" id="autoScroll" class="chk" checked> 自动滚动</label>
       </div>
-      <div class="sub-head" style="margin-top:12px">下发记录 <span class="hint" style="font-weight:400">路由组发布 / 撤回的明细回显</span></div>
-      <div id="bulkHistory" class="stack"></div>
     </div>
   </section>
 
@@ -724,8 +722,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
 
   // ---------- 日志（按类别分组折叠，默认每组只显示最新一条） ----------
   const logBox=$("log");
-  const LOG_TAGS=["announce","withdraw","source","group","routegroup","control","neighbor","conf","system"];
-  const TAG_NAMES={announce:"📢 发布",withdraw:"🗑️ 撤回",source:"📡 数据源",group:"🧩 分组",routegroup:"📦 路由组",control:"⌨️ 命令",neighbor:"👁️ 邻居",conf:"⚙️ 配置",system:"🛠 系统"};
+  const LOG_TAGS=["announce","withdraw","bulk","source","group","routegroup","control","neighbor","conf","system"];
+  const TAG_NAMES={announce:"📢 发布",bulk:"📋 下发记录",withdraw:"🗑️ 撤回",source:"📡 数据源",group:"🧩 分组",routegroup:"📦 路由组",control:"⌨️ 命令",neighbor:"👁️ 邻居",conf:"⚙️ 配置",system:"🛠 系统"};
   const LOG_ITEMS=[];          // {tag,line,cls}，最新在尾部
   const LOG_EXPANDED={};       // tag -> true/false 展开状态
   let LOG_FILTER=null;         // {ip, names:[...]} 按邻居/组过滤日志
@@ -1139,27 +1137,21 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
 
   // ---------- 下发记录回显 ----------
   function showBulk(j, act){
-    if(j.status==="error"){appendLog("❌ "+(j.msg||"下发失败"));return;}
+    const verb = act==="announce" ? "发布" : "撤回";
+    if(j.status==="error"){ appendLog("❌ "+verb+"失败："+(j.msg||"未知错误"), "bulk"); return; }
     const t=new Date().toLocaleTimeString();
-    const head=el("div","bulk-head","📢 "+(act==="announce"?"发布":"撤回")+" "+t+" · "+(j.groups||0)+" 组 / "+j.count+" 条");
-    const card=el("div","bulk-card "+(act==="announce"?"ok":"warn"));
-    card.appendChild(head);
+    appendLog("📋 "+verb+" "+t+" · "+(j.groups||0)+" 组 / "+j.count+" 条", "bulk");
     (j.detail||[]).forEach(function(gd){
-      const meta=el("div","bulk-meta","目标分组 ["+gd.group+"] → 邻居 "+(gd.neighbors||[]).join(", ")+" · 下一跳 "+gd.next_hop+" · 属性 "+(gd.community||"无")
-        +(gd.med?" · MED "+gd.med:"")+(gd.prepend?" · prepend "+gd.prepend:""));
-      card.appendChild(meta);
-      const det=el("details");
-      const sum=el("summary",null,"展开前缀明细（"+gd.routes.length+" 条）");
-      const box=el("div","bulk-routes",(gd.routes||[]).map(function(it){
-        return typeof it==="string"?it:(it.route+(it.next_hop||gd.next_hop?"  nh "+it.next_hop:"")+(it.community?"  comm "+it.community:""));
-      }).join("\n"));
-      det.appendChild(sum); det.appendChild(box);
-      card.appendChild(det);
+      const routes=gd.routes||[];
+      appendLog("　└ ["+gd.group+"] → 邻居 "+((gd.neighbors||[]).join(", ")||"—")
+        +" · 下一跳 "+gd.next_hop+" · 属性 "+(gd.community||"无")
+        +(gd.med?" · MED "+gd.med:"")+(gd.prepend?" · prepend "+gd.prepend:"")
+        +" · "+routes.length+" 条", "bulk");
+      if(routes.length){
+        const sample=routes.slice(0,3).map(function(it){ return (typeof it==="string")?it:(it.route||""); }).filter(Boolean);
+        appendLog("　　"+sample.join("  ")+(routes.length>3?("  … 共 "+routes.length+" 条"):""), "bulk");
+      }
     });
-    const box=$("bulkHistory");
-    box.insertBefore(card, box.firstChild);
-    while(box.children.length>30){box.removeChild(box.lastChild);}
-    appendLog("✅ "+(act==="announce"?"发布":"撤回")+" "+j.count+" 条完成，明细已回显");
   }
 
   // 下发预览：先 dry-run 拿到命令，再让运维确认
