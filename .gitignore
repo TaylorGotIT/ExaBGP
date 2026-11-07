@@ -6,6 +6,12 @@ __pycache__/
 venv/
 .venv/
 
+# ===== 打包/临时产物 =====
+*.tar.gz
+*.tgz
+.DS_Store
+Thumbs.db
+
 # ===== 本地保留、不入仓库的内容（仓库只保留 v6/）=====
 v1/
 v2/
@@ -14,4 +20,3 @@ v4/
 v5/
 demo-run/
 v6-pkg/
-v6-pkg.tar.gz
