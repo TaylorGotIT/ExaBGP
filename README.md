@@ -172,4 +172,4 @@ docker run -d --name exabgp-v6 --network host \
 
 ---
 
-<sub>图标说明：地球经纬网格（区域 / 全球 IP 网段）+ 控制台窗口（WebUI，内含 Python 标识与待下发的路由条目）+ `AS 65000` 域（箭头起点）+ 三条平行宣告箭头（逐条把 BGP UPDATE 播给 CE）+ 底部 ExaBGP 字标。源文件 `assets/icon.svg`，可直接用于文档、镜像标注与 favicon。</sub>
+<sub>图标说明：地球经纬网格（区域 / 全球 IP 网段）+ 控制台窗口（WebUI，内含 Python 标识与待下发的路由条目）+ `AS 65000` 域 + 从该圆域向外散射的 5 条宣告箭头（BGP UPDATE）+ 底部 ExaBGP 字标。源文件 `assets/icon.svg`，可直接用于文档、镜像标注与 favicon。</sub>
