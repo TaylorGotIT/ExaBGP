@@ -709,11 +709,22 @@
       });
     }
     if(LAST_NEIGHBORS && LAST_NEIGHBORS.neighbors){
+      // 邻居 → 所属分组（一个邻居可能被多个分组引用）
+      const ip2group={};
+      (GROUPS||[]).forEach(function(g){
+        (g.neighbors||[]).forEach(function(ip){
+          if(!ip2group[ip]) ip2group[ip]=[];
+          if(ip2group[ip].indexOf(g.name)<0) ip2group[ip].push(g.name);
+        });
+      });
       const down=[];
       Object.keys(LAST_NEIGHBORS.neighbors).forEach(function(ip){
         const st=LAST_NEIGHBORS.neighbors[ip]||{};
         const s=st.state||"unknown";
-        if(s!=="Established") down.push(ip+"（"+s+"）");
+        if(s==="Established") return;
+        const groups=ip2group[ip];
+        const ginfo = groups && groups.length ? groups.join("/") : "未分组";
+        down.push(ip+"（"+s+" · 组 "+ginfo+"）");
       });
       if(down.length) items.push({t:"err",m:"BGP 邻居未建立会话："+down.join("、")});
     }
