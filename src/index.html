@@ -1201,8 +1201,12 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       LAST_STATUS=d;
       CACHED_COUNT=d.cached_count||0;
       SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
+      // 分组增删改后，数据源"可见分组"的可选项要同步更新
+      const sig=groupsSig();
+      if(sig!==GROUPS_SIG){ GROUPS_SIG=sig; rebuildAddGroupsPicker(); }
       renderKpi(d);
-      if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+      // 正在输入、或分组下拉正打开时先不重绘，避免打断操作 / 把下拉关掉
+      if(!isEditing() && !groupMenuOpen()){renderSources();renderGroups();renderRouteGroups();}
       updateAlerts();
     }).catch(function(){});
   }
@@ -1262,7 +1266,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
 
     function gname(gid){
       for(let i=0;i<GROUPS.length;i++){ if(GROUPS[i].id===gid) return GROUPS[i].name; }
-      return gid;
+      return "(已删除:"+gid+")";   // 组被删了但绑定还留着，直接暴露出来
     }
     function setIds(ids){
       selected.length=0;
@@ -1273,6 +1277,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     function refresh(){
       btn.textContent = selected.length ? ("已选 "+selected.length+" 组："+selected.map(gname).join("、")+" ▾") : "全部组 ▾";
       btn.title = selected.length ? selected.map(gname).join("、") : "留空 = 发往全部启用分组";
+      const hasBad = selected.some(function(gid){ for(let i=0;i<GROUPS.length;i++){ if(GROUPS[i].id===gid) return false; } return true; });
+      btn.style.color = hasBad ? "var(--amber)" : "";
       menu.querySelectorAll("input[type=checkbox]").forEach(function(cb){
         cb.checked = cb.value==="" ? selected.length===0 : selected.indexOf(cb.value)>=0;
       });
@@ -1312,6 +1318,21 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     wrap.appendChild(val); wrap.appendChild(btn); wrap.appendChild(menu);
     refresh();
     return {wrap:wrap, value:function(){ return val.value; }};
+  }
+
+  let GROUPS_SIG = "";
+  function groupMenuOpen(){
+    const ms=document.querySelectorAll(".gsel-menu");
+    for(let i=0;i<ms.length;i++){ if(ms[i].style.display!=="none") return true; }
+    return false;
+  }
+  function groupsSig(){ return (GROUPS||[]).map(function(g){ return g.id+":"+g.name; }).join("|"); }
+  function rebuildAddGroupsPicker(){
+    const cell=$("addSrcGroupsCell"); if(!cell) return;
+    const cur = ADD_GROUPS ? ADD_GROUPS.value() : "";
+    cell.innerHTML="";
+    ADD_GROUPS = groupPicker(cur ? cur.split(",").filter(Boolean) : []);
+    cell.appendChild(ADD_GROUPS.wrap);
   }
 
   // ---------- 手动发布/撤回 ----------
