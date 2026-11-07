@@ -1,95 +1,94 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ExaBGP">
   <title>ExaBGP</title>
-  <desc>ExaBGP：Python 蛇 + 全球 IP 网络 + BGP 会话 + Web 控制台</desc>
+  <desc>ExaBGP：地球 IP 网络 + Python 驱动的 Web 控制台</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0b1220"/>
       <stop offset="0.55" stop-color="#111b30"/>
       <stop offset="1" stop-color="#18233d"/>
     </linearGradient>
-    <radialGradient id="globe" cx="0.34" cy="0.28" r="0.85">
-      <stop offset="0" stop-color="#1b4a6b"/>
+    <radialGradient id="globe" cx="0.34" cy="0.26" r="0.86">
+      <stop offset="0" stop-color="#1c4c6e"/>
       <stop offset="0.55" stop-color="#113050"/>
       <stop offset="1" stop-color="#0a1828"/>
     </radialGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.6">
+    <radialGradient id="glow" cx="0.5" cy="0.36" r="0.62">
       <stop offset="0" stop-color="#6d8dff" stop-opacity="0.16"/>
       <stop offset="1" stop-color="#6d8dff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="snake" x1="0.05" y1="0.9" x2="0.95" y2="0.2">
-      <stop offset="0" stop-color="#19a97f"/>
-      <stop offset="0.45" stop-color="#2dd4a7"/>
-      <stop offset="1" stop-color="#5cc8f5"/>
-    </linearGradient>
     <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1b2745"/>
       <stop offset="1" stop-color="#121b2e"/>
     </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6d8dff"/>
+      <stop offset="1" stop-color="#5cc8f5"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dbe4f5"/>
+      <stop offset="1" stop-color="#8fb4ff"/>
+    </linearGradient>
     <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
       <circle cx="2" cy="2" r="1.6" fill="#8ea0c0" opacity="0.10"/>
     </pattern>
-    <clipPath id="winClip"><rect x="286" y="326" width="196" height="128" rx="20"/></clipPath>
-    <marker id="arrow" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M1 1 L11 6 L1 11 Z" fill="#5cc8f5"/>
-    </marker>
+    <clipPath id="winClip"><rect x="112" y="228" width="288" height="154" rx="22"/></clipPath>
   </defs>
 
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <rect width="512" height="512" rx="112" fill="url(#dots)"/>
-  <circle cx="240" cy="240" r="230" fill="url(#glow)"/>
+  <circle cx="256" cy="200" r="220" fill="url(#glow)"/>
 
   <!-- 地球：经纬网格 + IP 点位 -->
   <g>
-    <circle cx="212" cy="252" r="134" fill="url(#globe)" stroke="#3a5f8c" stroke-width="6"/>
-    <path d="M126 168 A134 134 0 0 1 286 122" fill="none" stroke="#8ec6f2" stroke-opacity="0.16" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="256" cy="176" r="104" fill="url(#globe)" stroke="#3a5f8c" stroke-width="5"/>
+    <path d="M182 108 A104 104 0 0 1 306 80" fill="none" stroke="#8ec6f2" stroke-opacity="0.16" stroke-width="10" stroke-linecap="round"/>
     <g fill="none" stroke="#5b8fc4">
-      <ellipse cx="212" cy="252" rx="57" ry="134" stroke-width="3.4" opacity="0.5"/>
-      <ellipse cx="212" cy="252" rx="106" ry="134" stroke-width="3" opacity="0.3"/>
-      <ellipse cx="212" cy="252" rx="134" ry="50" stroke-width="3.4" opacity="0.45"/>
-      <ellipse cx="212" cy="252" rx="134" ry="99" stroke-width="3" opacity="0.26"/>
-      <path d="M212 118 A134 134 0 0 1 212 386" stroke-width="0" />
+      <ellipse cx="256" cy="176" rx="44" ry="104" stroke-width="2.8" opacity="0.5"/>
+      <ellipse cx="256" cy="176" rx="82" ry="104" stroke-width="2.4" opacity="0.28"/>
+      <ellipse cx="256" cy="176" rx="104" ry="39" stroke-width="2.8" opacity="0.45"/>
+      <ellipse cx="256" cy="176" rx="104" ry="77" stroke-width="2.4" opacity="0.24"/>
     </g>
     <g>
-      <circle cx="152" cy="196" r="6" fill="#5cc8f5"/>
-      <circle cx="252" cy="176" r="5" fill="#2dd4a7"/>
-      <circle cx="176" cy="300" r="5" fill="#f5b85c"/>
-      <circle cx="262" cy="286" r="6" fill="#5cc8f5"/>
-      <circle cx="228" cy="228" r="4" fill="#8fd9ff" opacity="0.8"/>
-      <circle cx="120" cy="252" r="4" fill="#2dd4a7" opacity="0.8"/>
+      <circle cx="208" cy="132" r="5" fill="#5cc8f5"/>
+      <circle cx="292" cy="120" r="4.2" fill="#2dd4a7"/>
+      <circle cx="222" cy="212" r="4.2" fill="#f5b85c"/>
+      <circle cx="300" cy="200" r="5" fill="#5cc8f5"/>
+      <circle cx="262" cy="160" r="3.4" fill="#8fd9ff" opacity="0.85"/>
+      <circle cx="176" cy="180" r="3.4" fill="#2dd4a7" opacity="0.85"/>
     </g>
   </g>
 
-  <!-- Python 蛇 -->
-  <path d="M 104.1 329.2 L 103.9 325.3 L 103.3 321.4 L 102.7 317.5 L 102.1 313.5 L 101.7 309.4 L 101.3 305.2 L 101.0 301.0 L 100.9 296.6 L 100.8 292.2 L 100.9 287.7 L 101.1 283.2 L 101.4 278.6 L 101.9 273.9 L 102.5 269.2 L 103.3 264.5 L 104.1 259.8 L 105.2 255.0 L 106.3 250.3 L 107.7 245.5 L 109.1 240.8 L 110.7 236.1 L 112.5 231.4 L 114.5 226.7 L 116.6 222.1 L 118.8 217.5 L 121.2 213.0 L 123.8 208.5 L 126.6 204.1 L 129.5 199.8 L 132.6 195.6 L 135.9 191.5 L 139.4 187.4 L 143.0 183.5 L 146.8 179.7 L 150.8 176.0 L 155.0 172.4 L 159.4 168.9 L 164.0 165.6 L 168.7 162.4 L 173.7 159.4 L 177.1 157.3 L 180.1 155.5 L 183.2 153.8 L 186.2 152.2 L 189.3 150.7 L 192.3 149.3 L 195.3 147.9 L 198.3 146.6 L 201.4 145.5 L 204.4 144.3 L 207.4 143.3 L 210.4 142.4 L 213.3 141.5 L 216.3 140.7 L 219.2 140.0 L 222.2 139.3 L 225.1 138.7 L 228.0 138.2 L 230.9 137.8 L 233.8 137.4 L 236.6 137.2 L 239.5 136.9 L 242.3 136.8 L 245.1 136.7 L 247.9 136.7 L 250.6 136.7 L 253.4 136.8 L 256.1 137.0 L 258.8 137.3 L 261.4 137.6 L 264.1 137.9 L 266.7 138.4 L 269.3 138.8 L 271.8 139.4 L 274.4 140.0 L 276.9 140.7 L 279.4 141.4 L 281.8 142.2 L 284.2 143.0 L 286.6 143.9 L 289.0 144.8 L 291.3 145.8 L 293.6 146.9 L 295.9 148.0 L 298.1 149.1 L 300.3 150.3 L 302.4 151.6 L 304.6 152.9 L 306.6 154.2 L 308.7 155.6 L 310.7 157.0 L 312.6 158.5 L 314.6 160.1 L 316.5 161.7 L 318.3 163.3 L 320.1 165.0 L 321.9 166.7 L 323.6 168.4 L 325.2 170.2 L 326.9 172.1 L 349.1 151.9 L 346.9 149.6 L 344.6 147.4 L 342.3 145.2 L 339.9 143.1 L 337.5 141.0 L 335.0 139.0 L 332.5 137.1 L 329.9 135.2 L 327.3 133.4 L 324.6 131.6 L 321.9 129.9 L 319.2 128.3 L 316.4 126.8 L 313.6 125.3 L 310.7 123.9 L 307.8 122.6 L 304.9 121.3 L 301.9 120.1 L 298.9 119.0 L 295.9 117.9 L 292.8 116.9 L 289.7 116.0 L 286.6 115.2 L 283.5 114.4 L 280.3 113.7 L 277.1 113.1 L 273.9 112.6 L 270.6 112.1 L 267.4 111.7 L 264.1 111.4 L 260.8 111.2 L 257.4 111.1 L 254.1 111.0 L 250.7 111.0 L 247.4 111.1 L 244.0 111.3 L 240.6 111.5 L 237.2 111.9 L 233.8 112.3 L 230.4 112.8 L 226.9 113.4 L 223.5 114.0 L 220.1 114.8 L 216.6 115.6 L 213.2 116.5 L 209.7 117.5 L 206.3 118.6 L 202.9 119.8 L 199.4 121.1 L 196.0 122.4 L 192.5 123.9 L 189.1 125.4 L 185.7 127.0 L 182.3 128.7 L 178.9 130.5 L 175.5 132.4 L 172.1 134.4 L 168.7 136.4 L 165.3 138.6 L 162.3 140.6 L 156.7 144.4 L 151.3 148.3 L 146.2 152.3 L 141.3 156.5 L 136.7 160.8 L 132.3 165.3 L 128.1 169.9 L 124.2 174.6 L 120.4 179.4 L 116.9 184.3 L 113.6 189.2 L 110.6 194.3 L 107.7 199.4 L 105.1 204.5 L 102.6 209.8 L 100.4 215.0 L 98.4 220.3 L 96.5 225.6 L 94.8 230.9 L 93.4 236.2 L 92.1 241.5 L 91.0 246.8 L 90.1 252.1 L 89.3 257.4 L 88.7 262.6 L 88.3 267.8 L 88.1 272.9 L 88.0 278.0 L 88.0 283.0 L 88.3 287.9 L 88.7 292.8 L 89.2 297.5 L 89.9 302.2 L 90.8 306.7 L 91.8 311.2 L 92.9 315.5 L 94.3 319.6 L 95.8 323.6 L 97.5 327.4 L 99.9 330.8 Z" fill="url(#snake)"/>
-  <circle cx="113.2" cy="208.8" r="2.7" fill="#0b1220" opacity="0.15"/><circle cx="180.8" cy="142.3" r="3.4" fill="#0b1220" opacity="0.15"/><circle cx="238.3" cy="124.4" r="3.8" fill="#0b1220" opacity="0.15"/><circle cx="291.3" cy="130.9" r="4.1" fill="#0b1220" opacity="0.15"/>
-  <g transform="rotate(28 352 176)">
-    <ellipse cx="352" cy="176" rx="30" ry="22" fill="url(#snake)"/>
-    <ellipse cx="364" cy="169" rx="8" ry="8" fill="#ffffff"/>
-    <ellipse cx="366" cy="169" rx="3.8" ry="3.8" fill="#0b1220"/>
-  </g>
-  <path d="M376 186 L392 180 M376 186 L392 192" stroke="#f4716e" stroke-width="4.2" stroke-linecap="round" fill="none"/>
-
-  <!-- BGP 会话：虚线 + 标签 -->
-  <path d="M398 146 L484 108" stroke="#5cc8f5" stroke-width="5.5" stroke-linecap="round"
-        stroke-dasharray="13 11" marker-end="url(#arrow)" opacity="0.95"/>
+  <!-- 控制台窗口（WebUI） -->
   <g>
-    <rect x="384" y="206" width="112" height="52" rx="26" fill="#0f1a2c" stroke="#5cc8f5" stroke-width="3.4"/>
-    <text x="440" y="243" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif"
-          font-size="28" font-weight="700" letter-spacing="3" fill="#bfe6ff">BGP</text>
-  </g>
-
-  <!-- 控制台窗口 -->
-  <g>
-    <rect x="286" y="326" width="196" height="128" rx="20" fill="url(#win)" stroke="#2e4066" stroke-width="5"/>
+    <rect x="112" y="228" width="288" height="154" rx="22" fill="url(#win)" stroke="#2e4066" stroke-width="5"/>
     <g clip-path="url(#winClip)">
-      <rect x="286" y="326" width="196" height="34" fill="#1c2846"/>
-      <circle cx="308" cy="343" r="5" fill="#f4716e"/>
-      <circle cx="325" cy="343" r="5" fill="#f5b85c"/>
-      <circle cx="342" cy="343" r="5" fill="#2dd4a7"/>
-      <rect x="304" y="378" width="86" height="9" rx="4.5" fill="#33456b"/>
-      <rect x="304" y="397" width="130" height="9" rx="4.5" fill="#2b3a5c"/>
-      <path d="M400 440 L418 418 L432 428 L454 396" fill="none" stroke="#5cc8f5" stroke-width="6"
+      <rect x="112" y="228" width="288" height="38" fill="#1c2846"/>
+      <circle cx="138" cy="247" r="5.4" fill="#f4716e"/>
+      <circle cx="156" cy="247" r="5.4" fill="#f5b85c"/>
+      <circle cx="174" cy="247" r="5.4" fill="#2dd4a7"/>
+
+      <!-- Python 标识 -->
+      <g transform="translate(132,284) scale(0.62)">
+        <path fill="#3776AB" d="M50.5 0c-27.6 0-25.9 12-25.9 12v12.4h26.4v3.7H11.4S0 26.9 0 54.4C0 81.9 10.1 80 10.1 80h6.2V67.5s-.3-10.1 9.9-10.1h17.1s9.6.2 9.6-9.3V9.7S54.4 0 50.5 0zM36.3 8.1a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2z"/>
+        <path fill="#FFD43B" d="M49.5 100c27.6 0 25.9-12 25.9-12V75.6H49v-3.7h39.6S100 73.1 100 45.6C100 18.1 89.9 20 89.9 20h-6.2v12.5s.3 10.1-9.9 10.1H56.7s-9.6-.2-9.6 9.3v20.4S45.6 100 49.5 100zm14.2-8.1a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+      </g>
+
+      <!-- 路由行 -->
+      <rect x="208" y="288" width="92" height="9" rx="4.5" fill="#33456b"/>
+      <rect x="208" y="307" width="140" height="9" rx="4.5" fill="#2b3a5c"/>
+      <rect x="208" y="326" width="76" height="9" rx="4.5" fill="#2b3a5c"/>
+      <path d="M312 356 L332 336 L346 346 L370 316" fill="none" stroke="url(#bar)" stroke-width="5.5"
             stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="370" cy="316" r="5" fill="#5cc8f5"/>
     </g>
   </g>
+
+  <!-- 路由宣告：从控制台向右发出的 BGP UPDATE -->
+  <path d="M414 296 L466 296" stroke="#5cc8f5" stroke-width="5.5" stroke-linecap="round"
+        stroke-dasharray="11 9" opacity="0.9"/>
+  <path d="M462 282 L484 296 L462 310 Z" fill="#5cc8f5" opacity="0.9"/>
+
+  <!-- 字标 -->
+  <text x="256" y="462" text-anchor="middle" font-family="Segoe UI, Arial, Helvetica, sans-serif"
+        font-size="60" font-weight="800" letter-spacing="1.5" fill="url(#word)">ExaBGP</text>
 </svg>
