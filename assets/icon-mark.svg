@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 420" width="512" height="420" role="img" aria-label="ExaBGP">
+  <title>ExaBGP</title>
+  <desc>ExaBGP：全球 IP 网络 + Python 驱动的 Web 控制台 + 从本 AS 域向外散射的 BGP 宣告</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="0.55" stop-color="#111b30"/>
+      <stop offset="1" stop-color="#18233d"/>
+    </linearGradient>
+    <radialGradient id="globe" cx="0.34" cy="0.26" r="0.86">
+      <stop offset="0" stop-color="#1c4c6e"/>
+      <stop offset="0.55" stop-color="#113050"/>
+      <stop offset="1" stop-color="#0a1828"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.36" r="0.62">
+      <stop offset="0" stop-color="#6d8dff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#6d8dff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2745"/>
+      <stop offset="1" stop-color="#121b2e"/>
+    </linearGradient>
+    <radialGradient id="asg" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#1a2b4a"/>
+      <stop offset="1" stop-color="#0d1728"/>
+    </radialGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dbe4f5"/>
+      <stop offset="1" stop-color="#8fb4ff"/>
+    </linearGradient>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#8ea0c0" opacity="0.10"/>
+    </pattern>
+    <clipPath id="winClip"><rect x="64" y="222" width="248" height="160" rx="22"/></clipPath>
+  </defs>
+
+  
+  
+  
+
+  <!-- 地球：经纬网格 + IP 点位 -->
+  <g>
+    <circle cx="196" cy="164" r="98" fill="url(#globe)" stroke="#3a5f8c" stroke-width="5"/>
+    <path d="M126 100 A98 98 0 0 1 244 74" fill="none" stroke="#8ec6f2" stroke-opacity="0.16" stroke-width="10" stroke-linecap="round"/>
+    <g fill="none" stroke="#5b8fc4">
+      <ellipse cx="196" cy="164" rx="41" ry="98" stroke-width="2.8" opacity="0.5"/>
+      <ellipse cx="196" cy="164" rx="77" ry="98" stroke-width="2.4" opacity="0.28"/>
+      <ellipse cx="196" cy="164" rx="98" ry="37" stroke-width="2.8" opacity="0.45"/>
+      <ellipse cx="196" cy="164" rx="98" ry="73" stroke-width="2.4" opacity="0.24"/>
+    </g>
+    <g>
+      <circle cx="150" cy="120" r="5" fill="#5cc8f5"/>
+      <circle cx="256" cy="110" r="4.2" fill="#2dd4a7"/>
+      <circle cx="170" cy="196" r="4.2" fill="#f5b85c"/>
+      <circle cx="250" cy="186" r="5" fill="#5cc8f5"/>
+      <circle cx="216" cy="150" r="3.4" fill="#8fd9ff" opacity="0.85"/>
+      <circle cx="112" cy="168" r="3.4" fill="#2dd4a7" opacity="0.85"/>
+    </g>
+  </g>
+
+  <!-- 控制台窗口（WebUI） -->
+  <g>
+    <rect x="64" y="222" width="248" height="160" rx="22" fill="url(#win)" stroke="#2e4066" stroke-width="5"/>
+    <g clip-path="url(#winClip)">
+      <rect x="64" y="222" width="248" height="36" fill="#1c2846"/>
+      <circle cx="88" cy="240" r="5.2" fill="#f4716e"/>
+      <circle cx="106" cy="240" r="5.2" fill="#f5b85c"/>
+      <circle cx="124" cy="240" r="5.2" fill="#2dd4a7"/>
+
+      <!-- Python 标识 -->
+      <g transform="translate(82,268) scale(0.52)">
+        <path fill="#3776AB" d="M50.5 0c-27.6 0-25.9 12-25.9 12v12.4h26.4v3.7H11.4S0 26.9 0 54.4C0 81.9 10.1 80 10.1 80h6.2V67.5s-.3-10.1 9.9-10.1h17.1s9.6.2 9.6-9.3V9.7S54.4 0 50.5 0zM36.3 8.1a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2z"/>
+        <path fill="#FFD43B" d="M49.5 100c27.6 0 25.9-12 25.9-12V75.6H49v-3.7h39.6S100 73.1 100 45.6C100 18.1 89.9 20 89.9 20h-6.2v12.5s.3 10.1-9.9 10.1H56.7s-9.6-.2-9.6 9.3v20.4S45.6 100 49.5 100zm14.2-8.1a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+      </g>
+
+      <!-- 待下发的路由条目 -->
+      <circle cx="152" cy="286" r="3.6" fill="#5cc8f5"/>
+      <rect x="162" y="281" width="104" height="10" rx="5" fill="#33456b"/>
+      <circle cx="152" cy="308" r="3.6" fill="#2dd4a7"/>
+      <rect x="162" y="303" width="122" height="10" rx="5" fill="#2b3a5c"/>
+      <circle cx="152" cy="330" r="3.6" fill="#f5b85c"/>
+      <rect x="162" y="325" width="86" height="10" rx="5" fill="#2b3a5c"/>
+    </g>
+  </g>
+
+  <!-- 本端 AS 域 -->
+  <circle cx="370" cy="302" r="62" fill="url(#asg)" stroke="#5cc8f5" stroke-width="4"/>
+  <text x="370" y="298" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif"
+        font-size="30" font-weight="700" fill="#bfe6ff" letter-spacing="1">AS</text>
+  <text x="370" y="328" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif"
+        font-size="19" font-weight="600" fill="#7fa8d8" letter-spacing="0.6">65000</text>
+
+  <!-- 从 AS 域向外散射的 BGP 宣告（5 路） -->
+  <g transform="translate(370,302)" stroke="#5cc8f5" stroke-width="5" stroke-linecap="round" opacity="0.95">
+    <g transform="rotate(-55)"><path d="M66 0 L112 0"/></g>
+    <g transform="rotate(-27.5)"><path d="M66 0 L112 0"/></g>
+    <g transform="rotate(0)"><path d="M66 0 L112 0"/></g>
+    <g transform="rotate(27.5)"><path d="M66 0 L112 0"/></g>
+    <g transform="rotate(55)"><path d="M66 0 L112 0"/></g>
+  </g>
+  <g transform="translate(370,302)" fill="#5cc8f5" opacity="0.95">
+    <g transform="rotate(-55)"><path d="M110 -8.5 L128 0 L110 8.5 Z"/></g>
+    <g transform="rotate(-27.5)"><path d="M110 -8.5 L128 0 L110 8.5 Z"/></g>
+    <g transform="rotate(0)"><path d="M110 -8.5 L128 0 L110 8.5 Z"/></g>
+    <g transform="rotate(27.5)"><path d="M110 -8.5 L128 0 L110 8.5 Z"/></g>
+    <g transform="rotate(55)"><path d="M110 -8.5 L128 0 L110 8.5 Z"/></g>
+  </g>
+</svg>
