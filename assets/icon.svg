@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ExaBGP">
   <title>ExaBGP</title>
-  <desc>ExaBGP：地球 IP 网络 + Python 驱动的 Web 控制台</desc>
+  <desc>ExaBGP：地球 IP 网络 + Python 驱动的 Web 控制台 + 多条 BGP 路由宣告</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0b1220"/>
@@ -20,10 +20,6 @@
       <stop offset="0" stop-color="#1b2745"/>
       <stop offset="1" stop-color="#121b2e"/>
     </linearGradient>
-    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#6d8dff"/>
-      <stop offset="1" stop-color="#5cc8f5"/>
-    </linearGradient>
     <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#dbe4f5"/>
       <stop offset="1" stop-color="#8fb4ff"/>
@@ -36,7 +32,7 @@
 
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <rect width="512" height="512" rx="112" fill="url(#dots)"/>
-  <circle cx="256" cy="200" r="220" fill="url(#glow)"/>
+  <circle cx="256" cy="196" r="220" fill="url(#glow)"/>
 
   <!-- 地球：经纬网格 + IP 点位 -->
   <g>
@@ -68,25 +64,32 @@
       <circle cx="174" cy="247" r="5.4" fill="#2dd4a7"/>
 
       <!-- Python 标识 -->
-      <g transform="translate(132,284) scale(0.62)">
+      <g transform="translate(132,282) scale(0.6)">
         <path fill="#3776AB" d="M50.5 0c-27.6 0-25.9 12-25.9 12v12.4h26.4v3.7H11.4S0 26.9 0 54.4C0 81.9 10.1 80 10.1 80h6.2V67.5s-.3-10.1 9.9-10.1h17.1s9.6.2 9.6-9.3V9.7S54.4 0 50.5 0zM36.3 8.1a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2z"/>
         <path fill="#FFD43B" d="M49.5 100c27.6 0 25.9-12 25.9-12V75.6H49v-3.7h39.6S100 73.1 100 45.6C100 18.1 89.9 20 89.9 20h-6.2v12.5s.3 10.1-9.9 10.1H56.7s-9.6-.2-9.6 9.3v20.4S45.6 100 49.5 100zm14.2-8.1a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
       </g>
 
-      <!-- 路由行 -->
-      <rect x="208" y="288" width="92" height="9" rx="4.5" fill="#33456b"/>
-      <rect x="208" y="307" width="140" height="9" rx="4.5" fill="#2b3a5c"/>
-      <rect x="208" y="326" width="76" height="9" rx="4.5" fill="#2b3a5c"/>
-      <path d="M312 356 L332 336 L346 346 L370 316" fill="none" stroke="url(#bar)" stroke-width="5.5"
-            stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="370" cy="316" r="5" fill="#5cc8f5"/>
+      <!-- 待下发的路由条目 -->
+      <circle cx="208" cy="286" r="3.6" fill="#5cc8f5"/>
+      <rect x="218" y="281" width="118" height="10" rx="5" fill="#33456b"/>
+      <circle cx="208" cy="308" r="3.6" fill="#2dd4a7"/>
+      <rect x="218" y="303" width="140" height="10" rx="5" fill="#2b3a5c"/>
+      <circle cx="208" cy="330" r="3.6" fill="#f5b85c"/>
+      <rect x="218" y="325" width="96" height="10" rx="5" fill="#2b3a5c"/>
     </g>
   </g>
 
-  <!-- 路由宣告：从控制台向右发出的 BGP UPDATE -->
-  <path d="M414 296 L466 296" stroke="#5cc8f5" stroke-width="5.5" stroke-linecap="round"
-        stroke-dasharray="11 9" opacity="0.9"/>
-  <path d="M462 282 L484 296 L462 310 Z" fill="#5cc8f5" opacity="0.9"/>
+  <!-- 多条路由宣告：从控制台发出的 BGP UPDATE -->
+  <g stroke="#5cc8f5" stroke-width="4.6" stroke-linecap="round" opacity="0.95">
+    <path d="M408 286 L456 286"/>
+    <path d="M408 308 L456 308"/>
+    <path d="M408 330 L456 330"/>
+  </g>
+  <g fill="#5cc8f5" opacity="0.95">
+    <path d="M454 278 L470 286 L454 294 Z"/>
+    <path d="M454 300 L470 308 L454 316 Z"/>
+    <path d="M454 322 L470 330 L454 338 Z"/>
+  </g>
 
   <!-- 字标 -->
   <text x="256" y="462" text-anchor="middle" font-family="Segoe UI, Arial, Helvetica, sans-serif"
