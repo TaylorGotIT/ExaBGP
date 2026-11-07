@@ -116,13 +116,32 @@ IPS_GROUP_NAME = "IPS-BLACKHOLE"
 IPS_NEXT_HOP = "192.0.2.1"          # RFC 6666 Discard Prefix
 IPS_COMMUNITY = "65535:666"         # RFC 7999 BLACKHOLE
 
+def calibrate_ips_group():
+    """把名为 IPS-BLACKHOLE 的分组校准为固定值（存在才校准，不自动建组）
+
+    IPS 源就是普通数据源，只是绑定到这个组；组本身下一跳/社区固定，避免配错。
+    """
+    for g in GROUPS.values():
+        if g.get("name") != IPS_GROUP_NAME and not g.get("ips"):
+            continue
+        changed = False
+        if g.get("next_hop") != IPS_NEXT_HOP:
+            g["next_hop"] = IPS_NEXT_HOP; changed = True
+        if g.get("community") != IPS_COMMUNITY:
+            g["community"] = IPS_COMMUNITY; changed = True
+        if not g.get("isolated"):
+            g["isolated"] = True; changed = True
+        if changed:
+            save_config()
+            log(f"🛡️ 已把分组 [{g['name']}] 校准为固定黑洞属性：下一跳 {IPS_NEXT_HOP} · community {IPS_COMMUNITY}")
+
 def ensure_ips_group():
-    """确保 IPS 黑洞分组存在并校准为固定值：隔离 + 固定 next-hop/community，邻居跟随第一个普通组"""
-    g = None
+    """（历史接口）确保 IPS 分组存在：已存在则校准，不存在则新建"""
     for x in GROUPS.values():
         if x.get("ips") or x.get("name") == IPS_GROUP_NAME:
-            g = x
-            break
+            calibrate_ips_group()
+            return x["id"]
+    g = None
     if g is None:
         donor = None
         for x in GROUPS.values():
@@ -1070,14 +1089,11 @@ class SourcesApiHandler(BaseHandler):
                 if not url:
                     raise ValueError("url 不能为空")
                 sid = "s" + uuid.uuid4().hex[:6]
-                is_ips = bool(data.get("ips"))
-                gid_ips = ensure_ips_group() if is_ips else None
                 SOURCES[sid] = {
                     "id": sid, "name": str(data.get("name") or url),
                     "url": url, "interval": max(10, int(data.get("interval", 3600))),
                     "enabled": bool(data.get("enabled", True)),
-                    "ips": is_ips,
-                    "groups": [gid_ips] if is_ips else parse_group_refs(data.get("groups")),
+                    "groups": parse_group_refs(data.get("groups")),
                     "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
                 }
                 save_config()
@@ -1100,14 +1116,7 @@ class SourcesApiHandler(BaseHandler):
                 if "interval" in data:
                     s["interval"] = max(10, int(data["interval"]))
                     s["next_due"] = time.time() + s["interval"]     # 新频率立即生效
-                if data.get("ips"):
-                    s["ips"] = True
-                    s["groups"] = [ensure_ips_group()]
-                elif "ips" in data and not data.get("ips"):
-                    s["ips"] = False
-                    if "groups" in data:
-                        s["groups"] = parse_group_refs(data.get("groups"))
-                elif "groups" in data:
+                if "groups" in data:
                     s["groups"] = parse_group_refs(data.get("groups"))
                 if "enabled" in data and bool(data["enabled"]) != s["enabled"]:
                     if bool(data["enabled"]):
@@ -1243,6 +1252,7 @@ class GroupsApiHandler(BaseHandler):
                     ioloop.add_callback(announce_union_to_group, gid)
                     log(f"🔁 分组 [{g['name']}] 下发属性变更，正在按新属性重播全库路由")
                 save_config()
+                calibrate_ips_group()   # IPS 组固定下一跳/社区，防止被改坏
                 ioloop.add_callback(regenerate_conf, f"更新分组 {g['name']}")
                 log(f"✏️ 分组 [{g['name']}] 已更新")
                 self.write({"status": "ok", "id": gid})
@@ -1778,6 +1788,8 @@ async def run_server():
     print(f"🏷️  默认属性   (ROUTE_COMMUNITY) : {cfg['ROUTE_COMMUNITY']}", file=sys.stderr)
     print(f"📦 数据源 {len(SOURCES)} 个 / 分组 {len(GROUPS)} 个 / 路由组 {len(ROUTE_GROUPS)} 个", file=sys.stderr)
     print("===========================================================", file=sys.stderr)
+
+    calibrate_ips_group()   # IPS 分组固定下一跳/社区（存在才校准，不新建）
 
     # 首次/启动时生成 exabgp.conf（分组变更时由 API 钩子重生成 + SIGHUP 热重载）
     regenerate_conf("启动", notify=False)

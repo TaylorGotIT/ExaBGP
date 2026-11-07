@@ -125,9 +125,22 @@ def render_conf_text(config, runtime):
     enabled = [g for g in config.get("groups", []) if g.get("enabled", True)]
     if not enabled:
         parts.append("# ⚠️ 当前没有任何启用的分组，未生成任何邻居声明")
+    # 同一个邻居 IP 可能被多个分组引用（如 IPS 黑洞组与默认组指向同一台 CE），
+    # exabgp 不允许重复 neighbor 声明，这里按 IP 去重，只声明一次会话参数。
+    ip_names = {}
     for g in enabled:
         for ip in g.get("neighbors", []):
-            parts.append(neighbor_block(ip, g, runtime))
+            ip_names.setdefault(str(ip).strip(), []).append(g.get("name", g["id"]))
+    done = set()
+    for g in enabled:
+        for ip in g.get("neighbors", []):
+            key = str(ip).strip()
+            if key in done:
+                continue          # 已声明过，跳过（路由属性在 announce 命令里按组区分）
+            done.add(key)
+            gg = dict(g)
+            gg["name"] = "-".join(ip_names[key])   # description 不能含空格
+            parts.append(neighbor_block(key, gg, runtime))
     return "\n".join(parts) + "\n"
 
 
