@@ -158,6 +158,37 @@
   .rg-prow:last-child{border-bottom:0}
   .rg-prow .p{font-family:Consolas,monospace;font-size:12.5px;color:var(--green);overflow:hidden;text-overflow:ellipsis}
 
+  /* ---------- 告警横幅 ---------- */
+  .alert-bar{display:none;flex-direction:column;gap:6px}
+  .alert-bar.on{display:flex}
+  .alert{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-radius:8px;font-size:12.5px;line-height:1.55;border:1px solid}
+  .alert.err{background:rgba(244,113,110,.10);border-color:rgba(244,113,110,.45);color:#ffcdca}
+  .alert.warn{background:rgba(245,184,92,.10);border-color:rgba(245,184,92,.42);color:#ffe1b3}
+  .alert .ic{flex:0 0 auto}
+
+  /* ---------- toast ---------- */
+  #toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:300;max-width:420px}
+  .toast{padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.5;border:1px solid var(--border);background:#16223c;color:var(--text);box-shadow:0 10px 28px rgba(0,0,0,.5);animation:tin .16s ease-out}
+  .toast.ok{border-color:rgba(45,212,167,.55)} .toast.err{border-color:rgba(244,113,110,.6)} .toast.warn{border-color:rgba(245,184,92,.6)}
+  @keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ---------- 确认框 ---------- */
+  .modal-box.sm{width:min(540px,94vw)}
+  .cfm-body{font-size:13px;line-height:1.75;color:var(--text)}
+  .cfm-body .warnline{color:var(--amber);margin-top:8px}
+  .cfm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  button.dangerous{background:#7a2b2f;border-color:#a3383d;color:#ffe3e2}
+  button.dangerous:hover{background:#8f3237;border-color:var(--red)}
+
+  /* ---------- 表头排序 / 搜索 ---------- */
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{color:var(--text)}
+  th.sortable .ar{opacity:.4;font-size:10px;margin-left:3px}
+  th.sortable.on .ar{opacity:1;color:var(--accent)}
+  .search{position:relative;flex:0 0 auto}
+  .search input{width:250px;padding-left:26px}
+  .search::before{content:"⌕";position:absolute;left:9px;top:4px;color:var(--muted);font-size:14px;pointer-events:none}
+
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:#2a3a5e;border-radius:4px}
   ::-webkit-scrollbar-thumb:hover{background:#3a4b6e}
@@ -183,9 +214,12 @@
       <div class="sub">多源差分 · 分组邻居传播 · IP 路由组</div>
     </div>
     <span class="spacer"></span>
+    <div class="search"><input id="globalSearch" placeholder="搜索 组名 / IP / 前缀 / URL"></div>
     <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
     <button id="btnRefresh" class="primary">立即刷新全部数据源</button>
   </header>
+
+  <div id="alertBar" class="alert-bar"></div>
 
   <div class="cards">
     <div class="card"><div class="k">已缓存路由数（全库并集）</div><div class="v" id="kpiCount">–</div></div>
@@ -246,7 +280,7 @@
           <col style="width:170px"><col><col style="width:110px"><col style="width:80px"><col style="width:250px"><col style="width:200px">
         </colgroup>
         <thead>
-          <tr><th>名称</th><th>URL</th><th class="num">间隔（秒）</th><th class="ctr">启用</th><th>状态</th><th class="act">操作</th></tr>
+          <tr><th data-table="src" data-sort="name">名称</th><th>URL</th><th class="num" data-table="src" data-sort="interval">间隔（秒）</th><th class="ctr">启用</th><th>状态</th><th class="act">操作</th></tr>
         </thead>
         <tbody id="srcList"></tbody>
         <tfoot>
@@ -283,7 +317,7 @@
           <col style="width:52px"><col><col style="width:90px"><col style="width:200px"><col style="width:190px"><col style="width:110px"><col style="width:100px"><col style="width:230px">
         </colgroup>
         <thead>
-          <tr><th class="ctr">选择</th><th>名称</th><th class="num">前缀数</th><th>下一跳（可选覆盖）</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="act">操作</th></tr>
+          <tr><th class="ctr">选择</th><th data-table="rg" data-sort="name">名称</th><th class="num" data-table="rg" data-sort="count">前缀数</th><th>下一跳（可选覆盖）</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="act">操作</th></tr>
         </thead>
         <tbody id="rgList"></tbody>
         <tfoot>
@@ -319,7 +353,7 @@
           <col style="width:150px"><col><col style="width:160px"><col style="width:150px"><col style="width:110px"><col style="width:100px"><col style="width:80px"><col style="width:170px">
         </colgroup>
         <thead>
-          <tr><th>组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
+          <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
         </thead>
         <tbody id="grpList"></tbody>
         <tfoot>
@@ -384,7 +418,24 @@
       <div id="rgModalList"></div>
     </div>
   </div>
+
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-box sm">
+      <div class="modal-head"><span class="t" id="cfmTitle">确认操作</span></div>
+      <div class="cfm-body" id="cfmBody"></div>
+      <div id="cfmInputWrap" style="display:none;margin-top:12px">
+        <div class="mini-label">请输入 <b id="cfmReq" style="color:var(--text)"></b> 以确认：</div>
+        <input id="cfmInput" autocomplete="off">
+      </div>
+      <div class="cfm-actions">
+        <button id="cfmCancel">取消</button>
+        <button id="cfmOk" class="dangerous">确认</button>
+      </div>
+    </div>
+  </div>
 </div>
+
+<div id="toasts"></div>
 
 <script>
 (function(){
@@ -393,6 +444,137 @@
   const $=id=>document.getElementById(id);
   function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function cell(cls,text){const d=el("td",cls);if(text!=null)d.textContent=text;return d;}
+
+  // ---------- 全局搜索 / 排序 / 提示 / 确认 ----------
+  let SEARCH="";
+  const SORT={src:null,grp:null,rg:null};   // {key,dir}
+  let LAST_STATUS=null, LAST_NEIGHBORS=null, SSE_OK=false;
+  let CACHED_COUNT=0;
+
+  function toast(msg, type){
+    const box=$("toasts"); if(!box)return;
+    const d=el("div","toast "+(type||""));
+    d.textContent=msg;
+    box.appendChild(d);
+    setTimeout(function(){
+      d.style.transition="opacity .25s"; d.style.opacity="0";
+      setTimeout(function(){ if(d.parentNode)d.parentNode.removeChild(d); },280);
+    }, type==="err"?6500:3200);
+  }
+
+  // 通用确认框：opts={title, lines:[string|{text,warn}], okText, requireText}
+  let cfmResolve=null;
+  function askConfirm(opts){
+    return new Promise(function(resolve){
+      cfmResolve=resolve;
+      $("cfmTitle").textContent=opts.title||"确认操作";
+      const body=$("cfmBody"); body.innerHTML="";
+      (opts.lines||[]).forEach(function(l){
+        const isObj=(typeof l==="object");
+        const p=el("div", isObj&&l.warn?"warnline":null);
+        p.textContent=isObj?l.text:l;
+        body.appendChild(p);
+      });
+      const need=opts.requireText||null;
+      $("cfmInputWrap").style.display=need?"block":"none";
+      $("cfmReq").textContent=need||"";
+      $("cfmInput").value="";
+      $("cfmOk").textContent=opts.okText||"确认";
+      $("cfmOk").className="dangerous";
+      $("confirmModal").classList.remove("hidden");
+      setTimeout(function(){ (need?$("cfmInput"):$("cfmOk")).focus(); },40);
+    });
+  }
+  function closeConfirm(v){
+    $("confirmModal").classList.add("hidden");
+    if(cfmResolve){ const r=cfmResolve; cfmResolve=null; r(!!v); }
+  }
+
+  // 按钮忙碌态：执行期间禁用并显示"处理中…"，避免重复提交
+  function busy(btn, fn){
+    if(!btn || btn.dataset.busy) return Promise.resolve();
+    const label=btn.textContent;
+    btn.dataset.busy="1"; btn.disabled=true; btn.textContent="处理中…";
+    const done=function(){ btn.disabled=false; btn.textContent=label; delete btn.dataset.busy; };
+    let p;
+    try { p=fn(); } catch(e){ done(); toast("操作异常："+e.message,"err"); return Promise.resolve(); }
+    return Promise.resolve(p).then(function(v){ done(); return v; }, function(e){ done(); toast("操作失败："+e.message,"err"); });
+  }
+
+  // 搜索命中：q 为空或任一字段包含关键字
+  function hitQ(){
+    const q=SEARCH.trim().toLowerCase();
+    if(!q)return true;
+    const args=Array.prototype.slice.call(arguments);
+    return args.some(function(v){ return String(v==null?"":v).toLowerCase().indexOf(q)>=0; });
+  }
+  function applySort(list, table, getters){
+    const s=SORT[table];
+    if(!s) return list;
+    const get=getters[s.key];
+    if(!get) return list;
+    const arr=list.slice();
+    arr.sort(function(a,b){
+      const va=get(a), vb=get(b);
+      let r;
+      if(typeof va==="number" && typeof vb==="number") r=va-vb;
+      else r=String(va==null?"":va).localeCompare(String(vb==null?"":vb),"zh");
+      return s.dir<0 ? -r : r;
+    });
+    return arr;
+  }
+  function bindSortHeaders(){
+    document.querySelectorAll("th[data-sort]").forEach(function(th){
+      th.classList.add("sortable");
+      if(!th.querySelector(".ar")){
+        const a=el("span","ar","↕"); th.appendChild(a);
+      }
+      th.onclick=function(){
+        const table=th.dataset.table, key=th.dataset.sort;
+        const cur=SORT[table];
+        SORT[table]=(cur && cur.key===key) ? {key:key,dir:-cur.dir} : {key:key,dir:1};
+        document.querySelectorAll('th[data-table="'+table+'"]').forEach(function(t){
+          t.classList.toggle("on", t===th);
+          const ar=t.querySelector(".ar"); if(ar) ar.textContent = (t===th ? (SORT[table].dir>0?"↑":"↓") : "↕");
+        });
+        if(table==="src") renderSources();
+        else if(table==="grp") renderGroups();
+        else renderRouteGroups();
+      };
+    });
+  }
+
+  // 顶部告警横幅：SSE 断开 / 源抓取失败 / 邻居未建立
+  function updateAlerts(){
+    const bar=$("alertBar"); if(!bar)return;
+    const items=[];
+    if(!SSE_OK) items.push({t:"warn",m:"实时日志通道（SSE）已断开，正在自动重连；状态仍按 10s 轮询刷新。"});
+    if(LAST_STATUS && LAST_STATUS.sources){
+      LAST_STATUS.sources.forEach(function(s){
+        if(s.enabled!==false && /失败|错误/.test(s.last_status||""))
+          items.push({t:"err",m:"数据源「"+s.name+"」最近一次抓取失败："+(s.last_status||"").slice(0,80)});
+      });
+    }
+    if(LAST_NEIGHBORS && LAST_NEIGHBORS.neighbors){
+      const down=[];
+      Object.keys(LAST_NEIGHBORS.neighbors).forEach(function(ip){
+        const st=LAST_NEIGHBORS.neighbors[ip]||{};
+        const s=st.state||"unknown";
+        if(s!=="Established") down.push(ip+"（"+s+"）");
+      });
+      if(down.length) items.push({t:"err",m:"BGP 邻居未建立会话："+down.join("、")});
+    }
+    bar.innerHTML="";
+    if(!items.length){ bar.classList.remove("on"); return; }
+    bar.classList.add("on");
+    items.slice(0,4).forEach(function(it){
+      const d=el("div","alert "+it.t);
+      d.appendChild(el("span","ic","⚠"));
+      d.appendChild(el("span",null,it.m));
+      bar.appendChild(d);
+    });
+  }
+
 
   // ---------- 日志（按类别分组折叠，默认每组只显示最新一条） ----------
   const logBox=$("log");
@@ -591,7 +773,11 @@
   function renderSources(){
     const body=$("srcList"); body.innerHTML="";
     if(!SOURCES.length){body.appendChild(emptyRow(6,"暂无数据源，请在下方添加。"));return;}
-    SOURCES.forEach(function(s){
+    const rows=applySort(
+      SOURCES.filter(function(s){return hitQ(s.name,s.url,s.last_status);}),
+      "src",{name:function(s){return s.name;},interval:function(s){return s.interval;}});
+    if(!rows.length){body.appendChild(emptyRow(6,"没有匹配「"+SEARCH+"」的数据源。"));return;}
+    rows.forEach(function(s){
       const tr=el("tr");
       const nm=el("input"); nm.value=s.name; nm.dataset.k="name";
       const ur=el("input"); ur.value=s.url; ur.dataset.k="url"; ur.title=s.url;
@@ -605,23 +791,47 @@
       const c4=cell("ctr"); c4.appendChild(en);
       const c5=el("td"); c5.appendChild(st);
       const c6=cell("act");
-      const sv=el("button","sm","保存"); sv.onclick=function(){saveSource(s.id,tr);};
-      const rf=el("button","sm","刷新"); rf.onclick=function(){refreshSource(s.id);};
-      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteSource(s.id);};
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveSource(s,tr,sv);};
+      const rf=el("button","sm","刷新"); rf.onclick=function(){refreshSource(s,rf);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteSource(s,dl);};
       c6.appendChild(sv); c6.appendChild(rf); c6.appendChild(dl);
       [c1,c2,c3,c4,c5,c6].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
     });
   }
-  function saveSource(id,tr){post("/api/sources",Object.assign({action:"update",id:id},readRow(tr))).then(loadStatus);}
-  function refreshSource(id){post("/api/sources",{action:"refresh",id:id}).then(loadStatus);}
-  function deleteSource(id){post("/api/sources",{action:"delete",id:id}).then(loadStatus);}
+  function saveSource(s,tr,btn){
+    return busy(btn,function(){return post("/api/sources",Object.assign({action:"update",id:s.id},readRow(tr)));})
+      .then(function(j){ if(j){ toast("已保存数据源「"+s.name+"」","ok"); loadStatus(); } });
+  }
+  function refreshSource(s,btn){
+    return busy(btn,function(){return post("/api/sources",{action:"refresh",id:s.id});})
+      .then(function(j){ if(j){ toast("已触发「"+s.name+"」立即刷新","ok"); loadStatus(); } });
+  }
+  async function requestDeleteSource(s,btn){
+    const ok=await askConfirm({
+      title:"删除数据源",
+      lines:[
+        "数据源："+s.name,
+        "URL："+(s.url||"—"),
+        "该源当前 "+(s.routes_count||0)+" 条路由；全库并集 "+CACHED_COUNT+" 条。",
+        {text:"删除后该源的路由会从并集移除（其他源仍覆盖的前缀会保留），操作不可恢复。",warn:true}
+      ],
+      okText:"删除",requireText:s.name
+    });
+    if(!ok)return;
+    const j=await busy(btn,function(){return post("/api/sources",{action:"delete",id:s.id});});
+    if(j){ toast("已删除数据源「"+s.name+"」","ok"); loadStatus(); }
+  }
 
   // ---------- 分组表 ----------
   function renderGroups(){
     const body=$("grpList"); body.innerHTML="";
     if(!GROUPS.length){body.appendChild(emptyRow(8,"暂无分组，请在下方添加。"));return;}
-    GROUPS.forEach(function(g){
+    const rows=applySort(
+      GROUPS.filter(function(g){return hitQ(g.name,(g.neighbors||[]).join(","),g.next_hop,g.community);}),
+      "grp",{name:function(g){return g.name;}});
+    if(!rows.length){body.appendChild(emptyRow(8,"没有匹配「"+SEARCH+"」的分组。"));return;}
+    rows.forEach(function(g){
       const tr=el("tr");
       const nm=el("input"); nm.value=g.name; nm.dataset.k="name";
       const nb=el("input"); nb.value=g.neighbors.join(","); nb.dataset.k="neighbors";
@@ -638,21 +848,59 @@
       const c6=cell("ctr"); c6.appendChild(pp);
       const c7=cell("ctr"); c7.appendChild(en);
       const c8=cell("act");
-      const sv=el("button","sm","保存"); sv.onclick=function(){saveGroup(g.id,tr);};
-      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteGroup(g.id);};
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveGroup(g,tr,sv);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteGroup(g,dl);};
       c8.appendChild(sv); c8.appendChild(dl);
       [c1,c2,c3,c4,c5,c6,c7,c8].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
     });
   }
-  function saveGroup(id,tr){post("/api/groups",Object.assign({action:"update",id:id},readRow(tr))).then(loadStatus);}
-  function deleteGroup(id){post("/api/groups",{action:"delete",id:id}).then(loadStatus);}
+  async function saveGroup(g,tr,btn){
+    const row=readRow(tr);
+    const attrChanged = String(row.next_hop||"")!==String(g.next_hop||"")
+      || String(row.community||"")!==String(g.community||"")
+      || String(row.med||"")!==String(g.med||"")
+      || Number(row.prepend||0)!==Number(g.prepend||0);
+    if(attrChanged && g.enabled){
+      const ok=await askConfirm({
+        title:"保存分组属性",
+        lines:[
+          "分组："+g.name+"（"+(g.neighbors||[]).length+" 个邻居）",
+          "下一跳 / community / MED / prepend 有变更，保存后会对该组**重播全库 "+CACHED_COUNT+" 条路由**。",
+          {text:"重播期间管道会有数秒繁忙，CE 侧这些前缀的属性会短暂变化。",warn:true}
+        ],
+        okText:"保存并重播"
+      });
+      if(!ok)return;
+    }
+    const j=await busy(btn,function(){return post("/api/groups",Object.assign({action:"update",id:g.id},row));});
+    if(j){ toast("已保存分组「"+g.name+"」"+(attrChanged&&g.enabled?"（正在重播）":""),"ok"); loadStatus(); }
+  }
+  async function requestDeleteGroup(g,btn){
+    const ok=await askConfirm({
+      title:"删除分组",
+      lines:[
+        "分组："+g.name,
+        "邻居："+(g.neighbors||[]).join("、"),
+        "将向该组 "+(g.neighbors||[]).length+" 个邻居撤回全库 "+CACHED_COUNT+" 条路由，并重生成 exabgp.conf。",
+        {text:"删除后分组配置不可恢复。",warn:true}
+      ],
+      okText:"删除",requireText:g.name
+    });
+    if(!ok)return;
+    const j=await busy(btn,function(){return post("/api/groups",{action:"delete",id:g.id});});
+    if(j){ toast("已删除分组「"+g.name+"」","ok"); loadStatus(); }
+  }
 
   // ---------- 路由组表 ----------
   function renderRouteGroups(){
     const body=$("rgList"); body.innerHTML="";
+    const rows=applySort(
+      ROUTEGROUPS.filter(function(rg){return hitQ(rg.name,rg.next_hop,rg.community);}),
+      "rg",{name:function(rg){return rg.name;},count:function(rg){return rg.prefixes_count;}});
     if(!ROUTEGROUPS.length){body.appendChild(emptyRow(8,"暂无路由组，请在下方添加。"));}
-    ROUTEGROUPS.forEach(function(rg){
+    else if(!rows.length){body.appendChild(emptyRow(8,"没有匹配「"+SEARCH+"」的路由组。"));}
+    rows.forEach(function(rg){
       const tr=el("tr");
       const ch=el("input"); ch.type="checkbox"; ch.className="chk rg-chk"; ch.dataset.id=rg.id;
       const nm=el("input"); nm.value=rg.name; nm.dataset.k="name";
@@ -669,8 +917,8 @@
       const c7=cell("ctr"); c7.appendChild(pp);
       const c8=cell("act");
       const lb=el("button","sm","列表"); lb.onclick=function(){openRgList(rg.id);};
-      const sv=el("button","sm","保存"); sv.onclick=function(){saveRouteGroup(rg.id,tr);};
-      const dl=el("button","sm danger","删除"); dl.onclick=function(){deleteRouteGroup(rg.id);};
+      const sv=el("button","sm","保存"); sv.onclick=function(){saveRouteGroup(rg,tr,sv);};
+      const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteRouteGroup(rg,dl);};
       c8.appendChild(lb); c8.appendChild(sv); c8.appendChild(dl);
       [c1,c2,c3,c4,c5,c6,c7,c8].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
@@ -678,50 +926,85 @@
     fillGroupSelects();
     fillRgLoad();
   }
-  function saveRouteGroup(id,tr){post("/api/routegroups",Object.assign({action:"update",id:id},readRow(tr))).then(loadStatus);}
-  function deleteRouteGroup(id){post("/api/routegroups",{action:"delete",id:id}).then(loadStatus);}
+  function saveRouteGroup(rg,tr,btn){
+    return busy(btn,function(){return post("/api/routegroups",Object.assign({action:"update",id:rg.id},readRow(tr)));})
+      .then(function(j){ if(j){ toast("已保存路由组「"+rg.name+"」（属性在下次发布时生效）","ok"); loadStatus(); } });
+  }
+  async function requestDeleteRouteGroup(rg,btn){
+    const ok=await askConfirm({
+      title:"删除路由组",
+      lines:[
+        "路由组："+rg.name,
+        "前缀数量："+rg.prefixes_count+" 条",
+        {text:"前缀集合将被永久删除（已下发到 CE 的路由不会自动撤回）。",warn:true}
+      ],
+      okText:"删除",requireText:rg.name
+    });
+    if(!ok)return;
+    const j=await busy(btn,function(){return post("/api/routegroups",{action:"delete",id:rg.id});});
+    if(j){ toast("已删除路由组「"+rg.name+"」","ok"); loadStatus(); }
+  }
 
   // ---------- 添加表单 ----------
   function addSource(){
-    post("/api/sources",{action:"add",name:$("addSrcName").value.trim(),url:$("addSrcUrl").value.trim(),
+    const name=$("addSrcName").value.trim()||"未命名源";
+    return post("/api/sources",{action:"add",name:$("addSrcName").value.trim(),url:$("addSrcUrl").value.trim(),
       interval:parseInt($("addSrcInterval").value,10)||3600,enabled:$("addSrcEnabled").checked})
-      .then(function(){["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;loadStatus();});
+      .then(function(j){ if(!j)return;
+        ["addSrcName","addSrcUrl"].forEach(function(i){$(i).value="";});$("addSrcInterval").value="3600";$("addSrcEnabled").checked=true;
+        toast("已添加数据源「"+name+"」","ok"); loadStatus(); });
   }
   function addGroup(){
     const name=$("addGrpName").value.trim();
-    if(!name){appendLog("❌ 添加失败：组名不能为空", "group");return;}
-    post("/api/groups",{action:"add",name:name,
+    if(!name){appendLog("❌ 添加失败：组名不能为空", "group");toast("添加失败：组名不能为空","err");return Promise.resolve();}
+    return post("/api/groups",{action:"add",name:name,
       neighbors:$("addGrpNeighbors").value.trim(),next_hop:$("addGrpNh").value.trim(),
       community:$("addGrpComm").value.trim(),
       med:$("addGrpMed").value.trim(),prepend:$("addGrpPrepend").value.trim(),
       enabled:$("addGrpEnabled").checked})
-      .then(function(){["addGrpName","addGrpNeighbors","addGrpNh","addGrpComm","addGrpMed","addGrpPrepend"].forEach(function(i){$(i).value="";});$("addGrpPrepend").value="0";$("addGrpEnabled").checked=true;loadStatus();});
+      .then(function(j){ if(!j)return;
+        ["addGrpName","addGrpNeighbors","addGrpNh","addGrpComm","addGrpMed","addGrpPrepend"].forEach(function(i){$(i).value="";});
+        $("addGrpPrepend").value="0";$("addGrpEnabled").checked=true;
+        toast("已添加分组「"+name+"」","ok"); loadStatus(); });
   }
   function addRouteGroup(){
     const name=$("addRgName").value.trim();
     const prefixes=$("addRgPrefixes").value.trim();
-    if(!name){appendLog("❌ 添加失败：名称不能为空", "routegroup");return;}
-    if(!prefixes){appendLog("❌ 添加失败：前缀列表不能为空（请手动粘贴至少一条前缀）", "routegroup");return;}
+    if(!name){appendLog("❌ 添加失败：名称不能为空", "routegroup");toast("添加失败：名称不能为空","err");return Promise.resolve();}
+    if(!prefixes){appendLog("❌ 添加失败：前缀列表不能为空（请手动粘贴至少一条前缀）", "routegroup");toast("添加失败：前缀列表不能为空","err");return Promise.resolve();}
     const body={action:"add",name:name,prefixes:prefixes,
       next_hop:$("addRgNh").value.trim(),community:$("addRgComm").value.trim(),
       med:$("addRgMed").value.trim(),prepend:$("addRgPrepend").value.trim()};
-    post("/api/routegroups",body)
-      .then(function(){["addRgName","addRgPrefixes","addRgNh","addRgComm","addRgMed","addRgPrepend"].forEach(function(i){$(i).value="";});loadStatus();});
+    return post("/api/routegroups",body)
+      .then(function(j){ if(!j)return;
+        ["addRgName","addRgPrefixes","addRgNh","addRgComm","addRgMed","addRgPrepend"].forEach(function(i){$(i).value="";});
+        toast("已添加路由组「"+name+"」","ok"); loadStatus(); });
   }
 
   // ---------- 通用 ----------
   function post(url,data){
     return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
       .then(function(r){return r.json();})
-      .then(function(j){if(j.status!=="ok"){appendLog("❌ API 错误: "+(j.msg||"未知错误"));throw new Error(j.msg);}return j;})
-      .catch(function(e){appendLog("❌ 请求失败: "+e.message);});
+      .then(function(j){
+        if(j.status!=="ok"){
+          const msg=j.msg||"未知错误";
+          appendLog("❌ API 错误: "+msg);
+          toast("操作失败："+msg,"err");
+          return null;
+        }
+        return j;
+      })
+      .catch(function(e){ appendLog("❌ 请求失败: "+e.message); toast("请求失败："+e.message,"err"); return null; });
   }
 
   function loadStatus(){
     fetch("/api/status").then(function(r){return r.json();}).then(function(d){
+      LAST_STATUS=d;
+      CACHED_COUNT=d.cached_count||0;
       SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
       renderKpi(d);
       if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+      updateAlerts();
     }).catch(function(){});
   }
 
@@ -751,24 +1034,54 @@
   }
 
   // ---------- 手动发布/撤回 ----------
-  function manual(act){
+  async function manual(act,btn){
     const routes=$("manualRoutes").value.split("\n").map(function(s){return s.trim();}).filter(Boolean);
-    if(!routes.length){appendLog("⚠️ 请先输入路由前缀");return;}
+    if(!routes.length){appendLog("⚠️ 请先输入路由前缀");toast("请先输入路由前缀","warn");return;}
+    if(act==="withdraw"){
+      const g=$("grpSel").options[$("grpSel").selectedIndex].textContent;
+      const ok=await askConfirm({
+        title:"撤回路由",
+        lines:[
+          "目标分组："+g,
+          "将撤回 "+routes.length+" 条前缀。",
+          {text:"撤回后 CE 侧这些前缀会消失，可能影响业务流量。",warn:true}
+        ],
+        okText:"撤回"
+      });
+      if(!ok)return;
+    }
     const body={group:$("grpSel").value,routes:routes};
     const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
-    post(url,body).then(function(j){showBulk(j,act);});
+    const j=await busy(btn,function(){return post(url,body);});
+    if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+routes.length+" 条前缀","ok"); }
   }
 
   // ---------- 路由组发布/撤回 ----------
   function checkedRouteGroupIds(){
     return Array.prototype.map.call(document.querySelectorAll(".rg-chk:checked"),function(c){return c.dataset.id;});
   }
-  function rgOps(act){
+  async function rgOps(act,btn){
     const ids=checkedRouteGroupIds();
-    if(!ids.length){appendLog("⚠️ 请先勾选要"+(act==="announce"?"发布":"撤回")+"的路由组");return;}
+    if(!ids.length){appendLog("⚠️ 请先勾选要"+(act==="announce"?"发布":"撤回")+"的路由组");toast("请先勾选路由组","warn");return;}
+    let total=0;
+    ids.forEach(function(id){ const rg=ROUTEGROUPS.filter(function(x){return x.id===id;})[0]; if(rg) total+=rg.prefixes_count||0; });
+    if(act==="withdraw"){
+      const g=$("rgTarget").options[$("rgTarget").selectedIndex].textContent;
+      const ok=await askConfirm({
+        title:"撤回选中路由组",
+        lines:[
+          "目标分组："+g,
+          "路由组："+ids.length+" 个，共 "+total+" 条前缀。",
+          {text:"撤回后 CE 侧这些前缀会消失，可能影响业务流量。",warn:true}
+        ],
+        okText:"撤回"
+      });
+      if(!ok)return;
+    }
     const body={group:$("rgTarget").value,route_groups:ids};
     const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
-    post(url,body).then(function(j){showBulk(j,act);});
+    const j=await busy(btn,function(){return post(url,body);});
+    if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+ids.length+" 个路由组（"+total+" 条前缀）","ok"); }
   }
 
   // ---------- 邻居监控 & 运行时控制 ----------
@@ -813,12 +1126,18 @@
     const se=el("span","st "+(state==="Established"?"est":(state==="unknown"?"unknown":"bad")),
       state+(state==="unknown"?"（未响应）":""));
     cs.appendChild(se); r.appendChild(cs);
-    r.appendChild(cell("num",(st.rib_count||0)+" 条"));
+    const rc=Number(st.rib_count||0);
+    const ribCell=cell("num", rc>0 ? (rc+" 条") : "—");
+    if(rc===0){ ribCell.title="未采集到 adj-rib-out 明细（点 adj-rib-out 查看实际发布表）；不代表没有发布"; }
+    r.appendChild(ribCell);
     r.appendChild(cell("num",(st.age==null?"–":st.age+"s 前")));
     const ca=cell("act");
     [["adj-rib-out","show_adj_rib_out"],["show route","show_route"],["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
       const b=el("button","sm"+(pair[1]==="teardown"?" danger":""),pair[0]);
-      b.onclick=function(){ctl(pair[1],ip);};
+      b.onclick=function(){
+        if(pair[1]==="teardown"){ requestTeardown(ip,b); }
+        else { busy(b,function(){return ctl(pair[1],ip);}); }
+      };
       ca.appendChild(b);
     });
     r.appendChild(ca);
@@ -872,22 +1191,41 @@
   function loadNeighbors(){
     fetch("/api/neighbors").then(function(r){return r.json();}).then(function(d){
       if(d.status==="error")return;
+      LAST_NEIGHBORS=d;
+      updateAlerts();
       if(nbEditing()){renderNeighborResp();return;}
       renderNeighbors(d);
     }).catch(function(){});
   }
   function ctl(action,ip){
-    post("/api/control",{action:action,neighbor:ip}).then(function(){loadResponses();loadNeighbors();});
+    return post("/api/control",{action:action,neighbor:ip}).then(function(j){
+      if(j){ loadResponses(); loadNeighbors(); }
+      return j;
+    });
+  }
+  async function requestTeardown(ip,btn){
+    const ok=await askConfirm({
+      title:"拆断 BGP 会话",
+      lines:[
+        "邻居："+ip,
+        {text:"会话会立即拆除，CE 侧该邻居的路由会被清空并重新学习（数十秒级中断）。",warn:true}
+      ],
+      okText:"拆断",requireText:ip
+    });
+    if(!ok)return;
+    const j=await busy(btn,function(){return ctl("teardown",ip);});
+    if(j) toast("已向 "+ip+" 发送 teardown","ok");
   }
   function loadMonitorConfig(){
     fetch("/api/monitor_config").then(function(r){return r.json();}).then(function(d){
       if(d.status==="ok")$("monitorInterval").value=d.interval;
     }).catch(function(){});
   }
-  function saveMonitorInterval(){
+  function saveMonitorInterval(btn){
     const v=parseInt($("monitorInterval").value,10);
-    if(!v||v<5||v>3600){appendLog("⚠️ 轮询间隔须在 5~3600 秒之间");return;}
-    post("/api/monitor_config",{interval:v}).then(function(){appendLog("✅ 邻居监控轮询间隔已保存为 "+v+"s");});
+    if(!v||v<5||v>3600){appendLog("⚠️ 轮询间隔须在 5~3600 秒之间");toast("轮询间隔须在 5~3600 秒之间","warn");return;}
+    return busy(btn,function(){return post("/api/monitor_config",{interval:v});})
+      .then(function(j){ if(j){ appendLog("✅ 邻居监控轮询间隔已保存为 "+v+"s"); toast("轮询间隔已保存为 "+v+" 秒","ok"); } });
   }
   function queryRowPrefix(ip,qi,qr){
     const p=qi.value.trim();
@@ -983,52 +1321,82 @@
       loadStatus();
     });
   }
-  function addPrefix(){
+  function addPrefix(btn){
     const p=$("rgAddPrefix").value.trim();
-    if(!p){appendLog("⚠️ 请输入前缀");return;}
-    post("/api/routegroups",{action:"add_prefix",id:curRg,prefix:p}).then(function(){
-      $("rgAddPrefix").value="";
-      afterRgChange();
-    });
+    if(!p){appendLog("⚠️ 请输入前缀");toast("请输入前缀","warn");return;}
+    return busy(btn,function(){return post("/api/routegroups",{action:"add_prefix",id:curRg,prefix:p});})
+      .then(function(j){ if(j){ $("rgAddPrefix").value=""; afterRgChange(); } });
   }
-  function delPrefix(p){
-    if(!confirm("删除前缀 "+p+" ？"))return;
+  async function delPrefix(p){
+    const ok=await askConfirm({
+      title:"删除前缀",
+      lines:["路由组："+(curRgData.name||""),"前缀："+p,{text:"删除后该前缀会从路由组中移除。",warn:true}],
+      okText:"删除"
+    });
+    if(!ok)return;
     post("/api/routegroups",{action:"delete_prefix",id:curRg,prefix:p}).then(afterRgChange);
   }
   function updPrefix(oldp,newp){
-    if(!newp||!oldp){appendLog("⚠️ 前缀不能为空");return;}
+    if(!newp||!oldp){appendLog("⚠️ 前缀不能为空");toast("前缀不能为空","warn");return;}
     post("/api/routegroups",{action:"update_prefix",id:curRg,old_prefix:oldp,new_prefix:newp}).then(afterRgChange);
   }
 
   // ---------- 绑定 ----------
-  $("btnAnnounce").onclick=function(){manual("announce");};
-  $("btnWithdraw").onclick=function(){manual("withdraw");};
-  $("btnRgAnnounce").onclick=function(){rgOps("announce");};
-  $("btnRgWithdraw").onclick=function(){rgOps("withdraw");};
+  $("btnAnnounce").onclick=function(){manual("announce",this);};
+  $("btnWithdraw").onclick=function(){manual("withdraw",this);};
+  $("btnRgAnnounce").onclick=function(){rgOps("announce",this);};
+  $("btnRgWithdraw").onclick=function(){rgOps("withdraw",this);};
   $("btnRgLoad").onclick=loadRgPrefixes;
-  $("btnRefresh").onclick=function(){post("/refresh",{}).then(function(){appendLog("⚡ 已触发全部数据源立即刷新");});};
-  $("btnAddSrc").onclick=addSource;
-  $("btnAddGrp").onclick=addGroup;
-  $("btnAddRg").onclick=addRouteGroup;
+  $("btnRefresh").onclick=function(){
+    busy(this,function(){return post("/refresh",{});}).then(function(j){
+      if(j){ appendLog("⚡ 已触发全部数据源立即刷新"); toast("已触发全部数据源刷新","ok"); }
+    });
+  };
+  $("btnAddSrc").onclick=function(){busy(this,addSource);};
+  $("btnAddGrp").onclick=function(){busy(this,addGroup);};
+  $("btnAddRg").onclick=function(){busy(this,addRouteGroup);};
   $("btnClear").onclick=clearLog;
-  $("btnSaveMonitor").onclick=saveMonitorInterval;
+  $("btnSaveMonitor").onclick=function(){ saveMonitorInterval(this); };
   $("rgModalClose").onclick=closeRgModal;
-  $("rgAddPrefixBtn").onclick=addPrefix;
-  $("rgAddPrefix").addEventListener("keydown",function(e){if(e.key==="Enter")addPrefix();});
+  $("rgAddPrefixBtn").onclick=function(){addPrefix(this);};
+  $("rgAddPrefix").addEventListener("keydown",function(e){if(e.key==="Enter")addPrefix($("rgAddPrefixBtn"));});
   $("rgFilter").addEventListener("input",renderRgList);
+
+  // 确认框
+  $("cfmCancel").onclick=function(){ closeConfirm(false); };
+  $("cfmOk").onclick=function(){
+    const need=$("cfmInputWrap").style.display!=="none" ? $("cfmReq").textContent : null;
+    if(need && $("cfmInput").value.trim()!==need){ toast("请输入 "+need+" 以确认","err"); return; }
+    closeConfirm(true);
+  };
+  $("cfmInput").addEventListener("keydown",function(e){ if(e.key==="Enter") $("cfmOk").click(); });
+  document.addEventListener("keydown",function(e){
+    if(e.key==="Escape" && !$("confirmModal").classList.contains("hidden")) closeConfirm(false);
+  });
+
+  // 全局搜索
+  $("globalSearch").addEventListener("input",function(){
+    SEARCH=this.value;
+    if(!isEditing()){ renderSources(); renderGroups(); renderRouteGroups(); }
+  });
+
+  // 表头排序
+  bindSortHeaders();
 
   // ---------- SSE ----------
   const dot=$("sseDot"), txt=$("sseTxt");
   const es=new EventSource("/api/logs");
-  es.onopen=function(){dot.className="dot";txt.textContent="SSE 已连接";};
-  es.onerror=function(){dot.className="dot off";txt.textContent="SSE 断开，重连中…";};
+  es.onopen=function(){ SSE_OK=true; dot.className="dot"; txt.textContent="SSE 已连接"; updateAlerts(); };
+  es.onerror=function(){ SSE_OK=false; dot.className="dot off"; txt.textContent="SSE 断开，重连中…"; updateAlerts(); };
   es.onmessage=function(ev){
     let d; try{d=JSON.parse(ev.data);}catch(e){return;}
     if(d.type==="log"){appendLog(d.message, d.tag);}
     else if(d.type==="status"){
+      LAST_STATUS=d; CACHED_COUNT=d.cached_count||0;
       renderKpi(d);
       SOURCES=d.sources||[]; GROUPS=d.groups||[]; ROUTEGROUPS=d.routegroups||[];
       if(!isEditing()){renderSources();renderGroups();renderRouteGroups();}
+      updateAlerts();
     }
   };
 
