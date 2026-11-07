@@ -90,20 +90,32 @@ fi
 
 # ---------- 5. systemd ----------
 info "安装 systemd 服务 $SERVICE"
-install -m 0644 "$HERE/$SERVICE.service" "/lib/systemd/system/$SERVICE.service"
+sed -e "s#@PREFIX@#$PREFIX#g" -e "s#@DATA_DIR@#$DATA_DIR#g" -e "s#@RUN_DIR@#$RUN_DIR#g" \
+    "$HERE/$SERVICE.service" > "/lib/systemd/system/$SERVICE.service"
 systemctl daemon-reload
 
 if systemctl is-active --quiet "$SERVICE"; then
   info "服务已在运行，重启以应用新版本"
   systemctl restart "$SERVICE"
 else
-  if ss -lntp 2>/dev/null | grep -q ':179 '; then
-    warn "179 端口已被占用（可能有其它 BGP 进程，比如 Docker 版仍在运行）"
-    warn "已安装但未启动。先停掉占用者，再执行：systemctl enable --now $SERVICE"
+  BUSY=0
+  pgrep -x exabgp >/dev/null 2>&1 && BUSY=1
+  if command -v docker >/dev/null 2>&1; then
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq 'exabgp' && BUSY=1
+  fi
+  if [ "$BUSY" = "1" ]; then
+    warn "检测到已有 ExaBGP 在运行（进程或容器），可能与新服务抢同一个 BGP 会话"
+    warn "已安装但未启动。先停掉旧的，再执行：systemctl enable --now $SERVICE"
+    SKIPPED_START=1
   else
     info "启动服务"
     systemctl enable --now "$SERVICE"
   fi
+fi
+
+if [ "${SKIPPED_START:-0}" = "1" ]; then
+  info "安装完成（服务未启动，见上面的提示）"
+  exit 0
 fi
 
 sleep 2

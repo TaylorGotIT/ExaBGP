@@ -7,7 +7,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/exabgp-injector/env
-ExecStart=/opt/exabgp-injector/run.sh
+Environment=DATA_DIR=@DATA_DIR@
+Environment=RUN_DIR=@RUN_DIR@
+ExecStart=@PREFIX@/run.sh
 Restart=always
 RestartSec=3
 # BGP 179 需要特权端口；也可改成专用用户 + AmbientCapabilities
