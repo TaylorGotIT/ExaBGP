@@ -112,8 +112,8 @@
   tr.nbrow td{border-bottom:0}
   tr.detail td{background:rgba(0,0,0,.16);padding:6px 10px 8px!important;height:auto!important}
   tr.detail:hover td{background:rgba(0,0,0,.16)!important}
-  .nbq{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .nbq input{width:260px;flex:0 0 auto;height:28px;font-family:Consolas,'Courier New',monospace}
+  .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
+  .nbq input{width:170px;flex:0 0 auto;height:26px;font-size:12px;font-family:Consolas,'Courier New',monospace}
   .nbq .nbq-res{font-size:12px;font-family:Consolas,'Courier New',monospace;white-space:nowrap}
   .nbresp{margin-top:4px}
   .nbresp-head{font-family:Consolas,'Courier New',monospace;font-size:11.5px;color:var(--green);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1328,6 +1328,18 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     r.appendChild(ribCell);
     r.appendChild(cell("num",(st.age==null?"–":st.age+"s 前")));
     const ca=cell("act");
+    // 前缀查询与其它邻居操作放同一行
+    const q=el("div","nbq");
+    const qi=el("input"); qi.type="text"; qi.placeholder="前缀，如 8.221.128.0/20";
+    qi.value=PREFIX_INPUT[ip]!=null?PREFIX_INPUT[ip]:((PREFIX_RESULT[ip]||{}).prefix||"");
+    qi.oninput=function(){PREFIX_INPUT[ip]=qi.value;};
+    const qb=el("button","sm","查询"); qb.title="查询该前缀是否已发布";
+    const qr=el("span","nbq-res");
+    if(PREFIX_RESULT[ip]){qr.textContent=PREFIX_RESULT[ip].text;qr.style.color=PREFIX_RESULT[ip].color;}
+    qb.onclick=function(){queryRowPrefix(ip,qi,qr);};
+    qi.onkeydown=function(e){if(e.key==="Enter")queryRowPrefix(ip,qi,qr);};
+    q.appendChild(qi); q.appendChild(qb); q.appendChild(qr);
+    ca.appendChild(q);
     [["adj-rib-out","show_adj_rib_out"],["show route","show_route"],["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
       const b=el("button","sm"+(pair[1]==="teardown"?" danger":""),pair[0]);
       b.onclick=function(){
@@ -1339,21 +1351,9 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     r.appendChild(ca);
     body.appendChild(r);
 
-    // 详情行：前缀查询 + 命令回显
+    // 详情行：命令回显
     const dr=el("tr","detail");
     const dd=el("td"); dd.colSpan=5;
-    const q=el("div","nbq");
-    const qi=el("input"); qi.type="text"; qi.placeholder="查询前缀，如 8.221.128.0/20";
-    qi.value=PREFIX_INPUT[ip]!=null?PREFIX_INPUT[ip]:((PREFIX_RESULT[ip]||{}).prefix||"");
-    qi.oninput=function(){PREFIX_INPUT[ip]=qi.value;};
-    const qb=el("button","sm","查询是否已发布");
-    const qr=el("span","nbq-res");
-    if(PREFIX_RESULT[ip]){qr.textContent=PREFIX_RESULT[ip].text;qr.style.color=PREFIX_RESULT[ip].color;}
-    qb.onclick=function(){queryRowPrefix(ip,qi,qr);};
-    qi.onkeydown=function(e){if(e.key==="Enter")queryRowPrefix(ip,qi,qr);};
-    q.appendChild(qi); q.appendChild(qb); q.appendChild(qr);
-    dd.appendChild(q);
-
     const resp=el("div","nbresp"); resp.dataset.ip=ip;
     const rh=el("div","nbresp-head"); rh.textContent="▶ 回显加载中…";
     const rl=el("div","nbresp-list");
