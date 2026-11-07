@@ -99,7 +99,19 @@ docker build -t exabgp:v6 ./src
 
 > GHCR 上的包默认是私有的：要么在 Package 设置里改成 Public，要么先 `docker login ghcr.io -u <用户名>`。
 
-### 启动
+### 原生安装（不用 Docker，推荐给生产服务器）
+
+```bash
+tar xzf exabgp-injector-v6.3.0-linux.tar.gz
+cd exabgp-injector-v6.3.0-linux
+sudo bash packaging/linux/install.sh
+```
+
+装完即 systemd 服务 `exabgp-injector`，控制台 `http://<服务器IP>:9550/`。
+目录：程序 `/opt/exabgp-injector`、数据 `/var/lib/exabgp-injector`、配置 `/etc/exabgp-injector/env`。
+详见 [packaging/linux/README.md](packaging/linux/README.md)。
+
+### 启动（Docker）
 
 ```bash
 # --network host 是必须的：BGP 179 + 控制台 9550 + exabgp FIFO

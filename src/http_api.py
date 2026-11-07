@@ -25,15 +25,16 @@ import threading
 import confgen
 from collections import deque
 
-EXABGP_IN = "/run/exabgp/exabgp.in"
-EXABGP_OUT = "/run/exabgp/exabgp.out"   # exabgp 运行时命令响应通道（text encoder 返回）
+RUN_DIR = os.environ.get("RUN_DIR", "/run/exabgp")      # FIFO / 运行时通道目录（原生安装可改）
+EXABGP_IN = os.environ.get("EXABGP_IN", RUN_DIR + "/exabgp.in")
+EXABGP_OUT = os.environ.get("EXABGP_OUT", RUN_DIR + "/exabgp.out")   # 命令响应通道（text encoder 返回）
 DEMO_MODE = EXABGP_IN.endswith(".cmd")  # 本地演示模式：无真实 exabgp 进程，由引擎模拟响应
 FSM_MAP = {"idle": "Idle", "connect": "Connect", "active": "Active", "opensent": "OpenSent",
            "openconfirm": "OpenConfirm", "established": "Established", "closing": "Closing",
            "down": "Down", "up": "Up"}
-PERSIST_DIR = "/exabgp/data"
-CONFIG_FILE = PERSIST_DIR + "/runtime_config.json"
-CONF_FILE = PERSIST_DIR + "/exabgp.conf"   # 按分组模板自动生成的 exabgp 配置
+PERSIST_DIR = os.environ.get("DATA_DIR", "/exabgp/data")   # 持久化目录（原生安装可改）
+CONFIG_FILE = os.environ.get("CONFIG_FILE", PERSIST_DIR + "/runtime_config.json")
+CONF_FILE = os.environ.get("CONF_FILE", PERSIST_DIR + "/exabgp.conf")   # 按分组模板自动生成的 exabgp 配置
 SOURCES_DIR = PERSIST_DIR + "/sources"
 ROUTEGROUPS_DIR = PERSIST_DIR + "/routegroups"
 LEGACY_CACHE_FILE = PERSIST_DIR + "/china_routes_local_bak.json"   # v5 旧快照（迁移用）
