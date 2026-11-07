@@ -176,6 +176,7 @@ curl -X POST http://127.0.0.1:9550/api/groups -H 'Content-Type: application/json
 | `med` | 否 | 0~4294967295，留空=不携带 |
 | `prepend` | 否 | 0~10，AS-PATH 中本地 AS 的额外重复次数 |
 | `enabled` | 否 | 默认 true |
+| `isolated` | 否 | 默认 false；true 时该组只接收显式绑定（`sources[].groups`）的数据源 |
 | `local_as` / `peer_as` / `local_address` / `router_id` | 否 | 逐组覆盖 conf 默认值（UI 未暴露） |
 
 行为：

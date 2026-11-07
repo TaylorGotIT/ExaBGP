@@ -370,20 +370,30 @@ def parse_group_refs(raw):
     return ids
 
 def source_groups(s):
-    """该数据源可见的分组：groups 为空 = 全部启用分组"""
+    """该数据源可见的分组：groups 为空 = 全部非隔离的启用分组"""
     bound = s.get("groups") or []
     if not bound:
-        return [g for g in GROUPS.values() if g["enabled"]]
+        return [g for g in GROUPS.values() if g["enabled"] and not g.get("isolated")]
     return [GROUPS[gid] for gid in bound if gid in GROUPS and GROUPS[gid]["enabled"]]
 
 def routes_for_group(gid):
-    """某分组实际可见的路由并集（只统计绑定到该组、或未绑定任何组的启用源）"""
+    """某分组实际可见的路由并集。
+
+    - 源显式绑定了分组：只有绑定的组可见
+    - 源未绑定（groups 为空）：默认可达所有组，但**隔离组（isolated）除外**
+      （隔离组用于 IPS 黑洞这类必须独占的用途，只接收显式绑定的源）
+    """
+    g = GROUPS.get(gid)
+    isolated = bool(g and g.get("isolated"))
     u = set()
     for s in SOURCES.values():
         if not s["enabled"]:
             continue
         bound = s.get("groups") or []
-        if bound and gid not in bound:
+        if bound:
+            if gid not in bound:
+                continue
+        elif isolated:
             continue
         u |= s["routes"]
     return u
@@ -407,7 +417,7 @@ def status_payload():
     grps = [{
         "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
         "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
-        "med": g.get("med", ""), "prepend": g.get("prepend", 0),
+        "isolated": bool(g.get("isolated")), "med": g.get("med", ""), "prepend": g.get("prepend", 0),
     } for g in GROUPS.values()]
     rgs = [{
         "id": rg["id"], "name": rg["name"], "prefixes_count": len(rg["prefixes"]),
@@ -439,7 +449,7 @@ def save_config():
             "groups": [{
                 "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
                 "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
-                "med": g.get("med", ""), "prepend": g.get("prepend", 0),
+                "isolated": bool(g.get("isolated")), "med": g.get("med", ""), "prepend": g.get("prepend", 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
             } for g in GROUPS.values()],
@@ -476,6 +486,7 @@ def load_config():
                 "neighbors": list(g.get("neighbors", [])),
                 "next_hop": g.get("next_hop", ""), "community": g.get("community", ""),
                 "enabled": bool(g.get("enabled", True)),
+                "isolated": bool(g.get("isolated", False)),
                 "med": str(g.get("med", "") or ""), "prepend": int(g.get("prepend", 0) or 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
@@ -1099,6 +1110,7 @@ class GroupsApiHandler(BaseHandler):
                     "id": gid, "name": name, "neighbors": neighbors,
                     "next_hop": str(data.get("next_hop", "")).strip(),
                     "community": str(data.get("community", "")).strip(),
+                    "isolated": bool(data.get("isolated", False)),
                     "med": normalize_med(data.get("med")),
                     "prepend": normalize_prepend(data.get("prepend")),
                     "enabled": bool(data.get("enabled", True)),
@@ -1138,6 +1150,12 @@ class GroupsApiHandler(BaseHandler):
                     g["next_hop"] = v
                 if "community" in data:
                     g["community"] = str(data["community"]).strip()
+                if "isolated" in data:
+                    before_iso = bool(g.get("isolated"))
+                    g["isolated"] = bool(data["isolated"])
+                    if before_iso != g["isolated"]:
+                        ioloop.add_callback(announce_union_to_group, gid)
+                        log(f"🔁 分组 [{g['name']}] 隔离属性变更，已按新的可见源重播")
                 if "med" in data:
                     g["med"] = normalize_med(data["med"])
                 if "prepend" in data:
