@@ -100,6 +100,8 @@ docker run -d --name exabgp-v6 --network host \
 
 首次启动会用环境变量生成默认的"数据源 + 分组"；之后所有变更都在控制台完成，并持久化到 `/exabgp/data/runtime_config.json`。
 
+> **一键部署 / 升级**：`sudo bash scripts/deploy.sh` —— 自动构建、重建容器（旧容器留作回滚）、并自检状态/缓存头/favicon/邻居。环境变量可覆盖各项参数，详见 [部署指南](docs/deployment.md)。
+
 完整部署（裸机 / systemd / 多实例 / 时区 / 备份）见 [部署指南](docs/deployment.md)。
 
 ## 常用操作
@@ -119,6 +121,7 @@ docker run -d --name exabgp-v6 --network host \
 .
 ├── README.md                    # 项目主页（本文件）
 ├── assets/                      # 徽标与图标（SVG 源文件 + 多尺寸 PNG）
+├── scripts/                     # 运维脚本（一键部署 deploy.sh）
 ├── docs/                        # 文档
 │   ├── architecture.md          # 架构与设计取舍
 │   ├── deployment.md            # 部署指南（Docker / 裸机 / 多实例）

@@ -64,6 +64,15 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9550/health
 
 ### 2.4 升级 / 回滚
 
+一键（推荐，构建 + 重建容器 + 自检，旧容器自动保留）：
+
+```bash
+sudo bash scripts/deploy.sh
+# 可覆盖参数：sudo PEER_AS=65002 NEXT_HOP=10.0.0.1 bash scripts/deploy.sh
+```
+
+手动方式：
+
 ```bash
 # 升级：重新 build 后跑一个新容器，旧容器改名留作回滚
 docker build --network host -t exabgp:v6 ./src
