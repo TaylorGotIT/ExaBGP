@@ -131,7 +131,7 @@ def calibrate_ips_group():
             g["community"] = IPS_COMMUNITY; changed = True
         if changed:
             save_config()
-            log(f"🛡️ 已把分组 [{g['name']}] 校准为固定黑洞属性：下一跳 {IPS_NEXT_HOP} · community {IPS_COMMUNITY}")
+            log(f"🛡️ {g['name']} 校准为 {IPS_NEXT_HOP} / {IPS_COMMUNITY}")
 
 
 # ============ 访问令牌 / 角色（未配置 API_TOKEN 时不启用鉴权） ============
@@ -531,7 +531,7 @@ def load_config():
             bad = [gid for gid in (s.get("groups") or []) if gid not in GROUPS]
             if bad:
                 s["groups"] = [gid for gid in (s.get("groups") or []) if gid in GROUPS]
-                log(f"⚠️ 数据源 [{s['name']}] 存在失效的分组绑定 {bad}，已清理")
+                log(f"⚠️ 源 {s['name']} 的失效绑定已清理 {bad}")
         # 恢复路由组前缀集合
         for rgid in list(ROUTE_GROUPS):
             p = routegroup_path(rgid)
@@ -659,14 +659,14 @@ def regenerate_conf(reason="", notify=True):
     （重读配置文件，尽量不中断已建立会话）。"""
     try:
         text = confgen.render_from_file(CONFIG_FILE, conf_file=CONF_FILE, write=True)
-        log(f"🔄 exabgp.conf 已重生成（{reason}），邻居 {confgen.count_neighbors(CONFIG_FILE)} 个")
+        log(f"🔄 配置已重载（{reason}）· 邻居 {confgen.count_neighbors(CONFIG_FILE)}")
         if notify:
             try:
                 with open(EXABGP_IN, "w") as f:
                     f.write("reload\n")
-                log("🔔 已向 exabgp 发送 reload，触发配置热重载（不中断会话）")
+                pass
             except Exception as e:
-                log(f"⚠️ 无法向 exabgp 发送 reload（{e}），重启 exabgp 后生效")
+                log(f"⚠️ 配置已重生成，但热重载失败（{e}）")
     except Exception as e:
         log(f"❌ exabgp.conf 重生成失败: {e}")
 
@@ -791,20 +791,20 @@ async def source_refresh_job(sid):
         return
     s["next_due"] = time.time() + float(s["interval"])
     LAST_REFRESH_TIME = time.strftime('%Y-%m-%d %H:%M:%S')
-    log(f"⏳ [源:{s['name']}] 开始获取 -> {s['url']}")
+    pass  # 不再打印"开始获取"，减少噪音
     try:
         latest = await asyncio.to_thread(download_url, s["url"])
     except Exception as e:
         s["last_status"] = "下载失败"; s["last_time"] = LAST_REFRESH_TIME
         LAST_REFRESH_STATUS = f"源[{s['name']}] 下载失败（熔断，保留旧路由）"
-        log(f"❌ [源:{s['name']}] 下载失败: {e}（熔断跳过，维持旧路由）")
+        log(f"❌ 源 {s['name']} 下载失败（保留旧路由）：{e}")
         alert("source:" + s["id"], f"数据源[{s['name']}]抓取失败：{e}")
         sse_broadcast_status()
         return
     if not latest:
         s["last_status"] = "列表为空"; s["last_time"] = LAST_REFRESH_TIME
         LAST_REFRESH_STATUS = f"源[{s['name']}] 返回空列表（熔断，保留旧路由）"
-        log(f"⚠️ [源:{s['name']}] 返回空列表，熔断跳过")
+        log(f"⚠️ 源 {s['name']} 返回空列表，保留旧路由")
         sse_broadcast_status()
         return
 
@@ -829,13 +829,14 @@ async def source_refresh_job(sid):
         total_add += len(add)
         total_del += len(dele)
         if add or dele:
-            log(f"🔁 分组 [{g['name']}] 差分：+{len(add)} / -{len(dele)}（可下发 {len(after)} 条）")
+            log(f"🔁 [{g['name']}] +{len(add)} / -{len(dele)}")
 
     await asyncio.to_thread(save_source_routes, sid)
     s["last_status"] = f"成功 (新增 {total_add}, 撤回 {total_del}, 本源 {len(latest)})"
     s["last_time"] = LAST_REFRESH_TIME
     LAST_REFRESH_STATUS = f"源[{s['name']}] 成功：新增 {total_add} / 撤回 {total_del} / 全库 {len(union_routes())}"
-    log(f"🎉 [源:{s['name']}] 差分完成：新增 {total_add}，撤回 {total_del}，全库 {len(union_routes())} 条")
+    if total_add or total_del:
+        log(f"✅ 源 {s['name']} +{total_add} / -{total_del}，全库 {len(union_routes())}")
     sse_broadcast_status()
 
 def save_source_routes(sid):
@@ -864,7 +865,7 @@ async def flush_source_routes(sid):
             await write_withdraws(dele, only_id=gid)
             total += len(dele)
     if total:
-        log(f"🗑️ [源:{s['name']}] 已按分组撤回 {total} 条不再覆盖的路由")
+        log(f"🗑️ 源 {s['name']} 撤回 {total} 条")
     s["last_status"] = "已停用/删除，路由已从邻居撤回"
     s["last_time"] = time.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -883,7 +884,7 @@ async def resync_source_binding(before_ids, before_sets, after_ids):
         if add:
             await write_announces(add, only_id=gid)
         if add or dele:
-            log(f"🔁 数据源绑定变化 → 分组 [{g['name']}]：+{len(add)} / -{len(dele)}")
+            log(f"🔁 绑定 [{g['name']}] +{len(add)} / -{len(dele)}")
 
 async def delete_source(sid):
     await flush_source_routes(sid)
@@ -895,7 +896,7 @@ async def delete_source(sid):
     except Exception:
         pass
     save_config()
-    log(f"🗑️ 数据源 [{name}] 已删除")
+    log(f"🗑️ 源 {name}")
     sse_broadcast_status()
 
 async def refresh_all_sources():
@@ -943,7 +944,7 @@ async def announce_union_to_groups(only_id=None):
         total += len(prefixes)
         await write_announces(prefixes, only_id=g["id"])
     if only_id is None and total:
-        log(f"⚡⚡ [🔥高可靠自愈] 开机回填完成：按分组可见并集共 {total} 条")
+        log(f"⚡ 开机回填 {total} 条")
 
 def restore_sources_from_disk():
     for sid, s in SOURCES.items():
@@ -964,7 +965,8 @@ async def announce_union_to_group(gid):
         return
     prefixes = routes_for_group(gid)
     await write_announces(prefixes, only_id=gid)
-    log(f"📢 分组 [{g['name']}] 已补发 {len(prefixes)} 条路由（重新启用或属性变更）")
+    if prefixes:
+        log(f"📢 [{g['name']}] 补发 {len(prefixes)} 条")
     sse_broadcast_status()
 
 async def withdraw_all_from_group(gid):
@@ -975,7 +977,7 @@ async def withdraw_all_from_group(gid):
     prefixes = routes_for_group(gid)
     if prefixes:
         await write_withdraws(prefixes, only_id=gid)
-        log(f"🗑️ 分组 [{g['name']}] 已停用/删除，撤回 {len(prefixes)} 条路由")
+        log(f"🗑️ [{g['name']}] 撤回 {len(prefixes)} 条")
     sse_broadcast_status()
 
 # ============ HTTP 接口 ============
@@ -1082,7 +1084,7 @@ class SourcesApiHandler(BaseHandler):
                 }
                 save_config()
                 ioloop.add_callback(source_refresh_job, sid)   # 立即生效
-                log(f"➕ 新增数据源 [{SOURCES[sid]['name']}] 间隔 {SOURCES[sid]['interval']}s")
+                log(f"➕ 源 {SOURCES[sid]['name']}（{SOURCES[sid]['interval']}s）")
                 self.write({"status": "ok", "id": sid})
             elif action == "update":
                 sid = data["id"]
@@ -1115,7 +1117,7 @@ class SourcesApiHandler(BaseHandler):
                 if s["enabled"] and set(before_ids) != set(after_ids):
                     await resync_source_binding(before_ids, before_sets, after_ids)
                 save_config()
-                log(f"✏️ 数据源 [{s['name']}] 已更新")
+                log(f"✏️ 源 {s['name']}")
                 self.write({"status": "ok", "id": sid})
             elif action == "refresh":
                 sid = data["id"]
@@ -1174,7 +1176,7 @@ class GroupsApiHandler(BaseHandler):
                 ioloop.add_callback(regenerate_conf, f"新增分组 {name}")
                 if GROUPS[gid]["enabled"]:
                     ioloop.add_callback(announce_union_to_group, gid)   # 补发全库
-                log(f"➕ 新增分组 [{name}] 邻居 {neighbors}")
+                log(f"➕ 分组 {name} → {neighbors}")
                 self.write({"status": "ok", "id": gid})
             elif action == "update":
                 gid = data["id"]
@@ -1227,11 +1229,11 @@ class GroupsApiHandler(BaseHandler):
                 new_attrs = (g["next_hop"], g["community"], g.get("med", ""), g.get("prepend", 0))
                 if not just_enabled and g["enabled"] and new_attrs != old_attrs:
                     ioloop.add_callback(announce_union_to_group, gid)
-                    log(f"🔁 分组 [{g['name']}] 下发属性变更，正在按新属性重播全库路由")
+                    log(f"🔁 分组 {g['name']} 属性变更，重播")
                 save_config()
                 calibrate_ips_group()   # IPS 组固定下一跳/社区，防止被改坏
                 ioloop.add_callback(regenerate_conf, f"更新分组 {g['name']}")
-                log(f"✏️ 分组 [{g['name']}] 已更新")
+                log(f"✏️ 分组 {g['name']}")
                 self.write({"status": "ok", "id": gid})
             elif action == "delete":
                 gid = data["id"]
@@ -1258,7 +1260,7 @@ async def _delete_group(gid):
         del GROUPS[gid]
     save_config()
     tornado.ioloop.IOLoop.current().add_callback(regenerate_conf, f"删除分组 {name}")
-    log(f"🗑️ 分组 [{name}] 已删除")
+    log(f"🗑️ 分组 {name}")
     sse_broadcast_status()
 
 class RouteGroupsApiHandler(BaseHandler):
@@ -1292,7 +1294,7 @@ class RouteGroupsApiHandler(BaseHandler):
                 }
                 save_routegroup_prefixes(rgid)
                 save_config()
-                log(f"➕ 新增路由组 [{name}] {len(prefixes)} 条前缀")
+                log(f"➕ 路由组 {name}（{len(prefixes)} 条）")
                 self.write({"status": "ok", "id": rgid})
             elif action == "update":
                 rgid = data["id"]
@@ -1326,7 +1328,7 @@ class RouteGroupsApiHandler(BaseHandler):
                 if changed:
                     save_routegroup_prefixes(rgid)
                 save_config()
-                log(f"✏️ 路由组 [{rg['name']}] 已更新")
+                log(f"✏️ 路由组 {rg['name']}")
                 self.write({"status": "ok", "id": rgid})
             elif action == "delete":
                 rgid = data["id"]
@@ -1339,7 +1341,7 @@ class RouteGroupsApiHandler(BaseHandler):
                 except Exception:
                     pass
                 save_config()
-                log(f"🗑️ 路由组 [{name}] 已删除")
+                log(f"🗑️ 路由组 {name}")
                 self.write({"status": "ok", "id": rgid})
             elif action == "add_prefix":
                 rgid = data["id"]
@@ -1353,7 +1355,7 @@ class RouteGroupsApiHandler(BaseHandler):
                     raise ValueError(f"前缀 {p} 已存在")
                 rg["prefixes"].add(p)
                 save_routegroup_prefixes(rgid)
-                log(f"➕ 路由组 [{rg['name']}] 添加前缀 {p}（共 {len(rg['prefixes'])} 条）")
+                log(f"➕ {rg['name']} {p}（共 {len(rg['prefixes'])}）")
                 self.write({"status": "ok", "prefix": p, "count": len(rg["prefixes"])})
             elif action == "delete_prefix":
                 rgid = data["id"]
@@ -1365,7 +1367,7 @@ class RouteGroupsApiHandler(BaseHandler):
                     raise ValueError(f"前缀 {p} 不存在")
                 rg["prefixes"].discard(p)
                 save_routegroup_prefixes(rgid)
-                log(f"🗑️ 路由组 [{rg['name']}] 删除前缀 {p}（余 {len(rg['prefixes'])} 条）")
+                log(f"🗑️ {rg['name']} {p}（余 {len(rg['prefixes'])}）")
                 self.write({"status": "ok", "count": len(rg["prefixes"])})
             elif action == "update_prefix":
                 rgid = data["id"]
@@ -1381,7 +1383,7 @@ class RouteGroupsApiHandler(BaseHandler):
                 rg["prefixes"].discard(old)
                 rg["prefixes"].add(new)
                 save_routegroup_prefixes(rgid)
-                log(f"✏️ 路由组 [{rg['name']}] 前缀 {old} → {new}")
+                log(f"✏️ {rg['name']} {old} → {new}")
                 self.write({"status": "ok", "old": old, "new": new, "count": len(rg["prefixes"])})
             else:
                 raise ValueError(f"未知 action: {action}")
@@ -1579,9 +1581,9 @@ class ControlHandler(BaseHandler):
                     raise ValueError("请指定邻居 IP")
                 cmds = [f"neighbor {ip} {verbs[action]}\n"]
             if action == "show_route":
-                log("ℹ️ show route 在 exabgp 4.x 不存在，已按等价命令 show adj-rib out 执行（查看已发布路由）")
+                pass
             await asyncio.to_thread(write_to_pipe, cmds)
-            log(f"⌨️ 运行时命令: {cmds[0].strip()}")
+            log(f"⌨️ 命令 {cmds[0].strip()}")
             self.write({"status": "ok", "sent": cmds[0].strip()})
         except Exception as e:
             self.set_status(500)
@@ -1627,7 +1629,7 @@ class MonitorConfigHandler(BaseHandler):
             global NEIGHBOR_POLL_INTERVAL, NEIGHBOR_NEXT_POLL
             NEIGHBOR_POLL_INTERVAL = v
             NEIGHBOR_NEXT_POLL = time.time() + v
-            log(f"📡 邻居监控轮询间隔已改为 {v}s")
+            log(f"📡 轮询间隔 {v}s")
             self.write({"status": "ok", "interval": NEIGHBOR_POLL_INTERVAL})
         except Exception as e:
             self.set_status(500)
@@ -1644,7 +1646,7 @@ class AdjRibHandler(BaseHandler):
             st = NEIGHBOR_STATES.get(ip, {})
             rib = st.get("adj_rib_out", [])
             found = prefix in rib
-            log(f"🔍 前缀查询: {prefix} @ {ip} → {'已发布' if found else '未发布'}（发布列表 {len(rib)} 条）")
+            log(f"🔍 {prefix} @ {ip}：{'已发布' if found else '未发布'}")
             self.write({"status": "ok", "ip": ip, "prefix": prefix, "found": found, "count": len(rib)})
         except Exception as e:
             self.set_status(500)
@@ -1768,7 +1770,7 @@ async def run_server():
     if not loaded or not SOURCES or not GROUPS:
         bootstrap_defaults()
         loaded = True
-        log("⚙️ 首次运行：已从环境变量建立默认数据源 + 默认分组")
+        log("⚙️ 首次运行：已生成默认源与默认分组")
 
     cfg = get_runtime_config()
     print("================== 📌 运行时环境变量快照 ==================", file=sys.stderr)

@@ -724,15 +724,15 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   const PREFIX_INPUT={};       // ip -> 输入中的草稿（重渲染不丢失）
 
   function inferTag(line){
-    if(/首次运行/.test(line))return "system";
-    if(/⌨️/.test(line))return "control";
+    if(/⌨️|📡 轮询/.test(line))return "control";
     if(/👁️|🔔 邻居/.test(line))return "neighbor";
     if(/📢/.test(line))return "announce";
-    if(/数据源|\[源:|快照|迁移/.test(line))return "source";
+    if(/📋/.test(line))return "bulk";
+    if(/源 |数据源/.test(line))return "source";
     if(/撤回/.test(line))return "withdraw";
     if(/路由组/.test(line))return "routegroup";
-    if(/exabgp\.conf|SIGHUP|热重载|重生成/.test(line))return "conf";
-    if(/分组/.test(line))return "group";
+    if(/配置已重载|已重生成|热重载|exabgp\.conf/.test(line))return "conf";
+    if(/分组|🔁 \[/.test(line))return "group";
     return "system";
   }
   function lineClass(line){
