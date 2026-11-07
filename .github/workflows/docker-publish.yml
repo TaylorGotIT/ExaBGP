@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -35,7 +37,9 @@ jobs:
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "image=ghcr.io/${OWNER}/exabgp" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          TAG="${{ inputs.tag }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_REF_NAME}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
