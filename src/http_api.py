@@ -1336,13 +1336,46 @@ class ForceRefreshHandler(BaseHandler):
         self.write({"status": "ok", "msg": "全部数据源刷新已触发。"})
 
 class ConfApiHandler(BaseHandler):
-    """预览/校验自动生成的 exabgp.conf（每次按当前配置实时渲染）"""
+    """预览/校验自动生成的 exabgp.conf（每次按当前配置实时渲染）
+
+    ?diff=1 时返回 JSON：{same, running, rendered, diff}，用于发现"配置漂移"
+    （含磁盘上正在生效的 conf 与按当前配置重新渲染结果的差异）
+    """
     async def get(self):
         try:
             text = confgen.render_from_file(CONFIG_FILE, conf_file=None, write=False)
         except Exception as e:
+            if self.get_argument("diff", "") == "1":
+                self.set_status(500)
+                self.write({"status": "error", "msg": f"渲染失败: {e}"})
+                return
             self.set_status(500)
             text = f"# 生成失败: {e}\n"
+        if self.get_argument("diff", "") == "1":
+            running = ""
+            try:
+                with open(CONF_FILE, "r", encoding="utf-8") as f:
+                    running = f.read()
+            except Exception:
+                running = ""
+            import difflib
+
+            def _strip(text):
+                # 生成时间每次渲染都不同，不算"漂移"
+                return [ln for ln in text.splitlines() if not re.match(r"^\s*#\s*生成时间", ln)]
+
+            run_lines, ren_lines = _strip(running), _strip(text)
+            diff = list(difflib.unified_diff(
+                run_lines, ren_lines,
+                fromfile="running: " + CONF_FILE, tofile="rendered", lineterm=""))
+            self.write({
+                "status": "ok",
+                "same": run_lines == ren_lines,
+                "running": running,
+                "rendered": text,
+                "diff": diff[:2000],
+            })
+            return
         self.set_header("Content-Type", "text/plain; charset=utf-8")
         self.write(text)
 

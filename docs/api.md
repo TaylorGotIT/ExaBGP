@@ -24,6 +24,7 @@
 | POST | `/bulk/withdraw` | 手动撤回 |
 | GET | `/api/logs` | SSE 实时日志 |
 | GET | `/api/audit?limit=200&q=` | 操作审计记录（新→旧，可按关键字过滤） |
+| GET | `/api/conf?diff=1` | 配置漂移检测：返回 `{same, running, rendered, diff}`（忽略生成时间戳） |
 | GET | `/metrics` | Prometheus 指标（`text/plain; version=0.0.4`，与 `/health` 一样免鉴权） |
 
 ### 下发预演（dry-run）

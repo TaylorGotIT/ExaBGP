@@ -181,6 +181,12 @@
   button.dangerous{background:#7a2b2f;border-color:#a3383d;color:#ffe3e2}
   button.dangerous:hover{background:#8f3237;border-color:var(--red)}
 
+  /* ---------- 配置预览 ---------- */
+  .confpre{max-height:64vh;overflow:auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,'Courier New',monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-all;margin:0}
+  .confpre .add{color:var(--green)}
+  .confpre .del{color:var(--red)}
+  .confpre .hunk{color:var(--accent)}
+
   /* ---------- 表头排序 / 搜索 ---------- */
   th.sortable{cursor:pointer;user-select:none}
   th.sortable:hover{color:var(--text)}
@@ -216,6 +222,7 @@
     </div>
     <span class="spacer"></span>
     <div class="search"><input id="globalSearch" placeholder="搜索 组名 / IP / 前缀 / URL"></div>
+    <button id="btnConf" class="sm" title="查看 exabgp.conf 与配置漂移">配置</button>
     <button id="btnAudit" class="sm" title="查看操作审计">审计</button>
     <button id="btnToken" class="sm" title="设置访问令牌">🔑</button>
     <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
@@ -457,6 +464,22 @@
           <tbody id="auditBody"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div id="confModal" class="modal hidden">
+    <div class="modal-box" style="width:min(1080px,96vw)">
+      <div class="modal-head">
+        <span class="t">exabgp.conf 预览 / 配置漂移</span>
+        <button id="confClose" class="sm">✕ 关闭</button>
+      </div>
+      <div class="rg-tool">
+        <span id="confState" class="status-text"></span>
+        <span class="spacer"></span>
+        <button id="confCopy" class="sm">复制全文</button>
+        <button id="confReload" class="sm">重新渲染</button>
+      </div>
+      <pre id="confPre" class="confpre"></pre>
     </div>
   </div>
 
@@ -1431,14 +1454,16 @@
   function refreshRgDetail(){
     return fetch(api("/api/routegroups/"+curRg)).then(function(r){return r.json();});
   }
+  let RG_SHOW=200;
   function renderRgList(){
     const all=curRgData.prefixes||[];
     const f=$("rgFilter").value.trim();
     const list=f?all.filter(function(p){return p.indexOf(f)>=0;}):all;
-    $("rgModalCount").textContent="显示 "+list.length+" / 共 "+all.length+" 条";
+    const page=list.slice(0, RG_SHOW);
+    $("rgModalCount").textContent="显示 "+page.length+" / "+list.length+" 条"+(f?"（已过滤，共 "+all.length+"）":"");
     const box=$("rgModalList"); box.innerHTML="";
     if(!list.length){box.appendChild(el("div","status-text","（空）"));return;}
-    list.forEach(function(p){
+    page.forEach(function(p){
       const r=el("div","rg-prow");
       const t=el("span","p",p); t.title=p;
       const ebtn=el("button","sm","改");
@@ -1448,6 +1473,12 @@
       r.appendChild(t); r.appendChild(ebtn); r.appendChild(dbtn);
       box.appendChild(r);
     });
+    if(list.length > page.length){
+      const more=el("button","sm","加载更多（剩余 "+(list.length-page.length)+" 条）");
+      more.style.margin="8px 10px";
+      more.onclick=function(){ RG_SHOW += 500; renderRgList(); };
+      box.appendChild(more);
+    }
   }
   function editPrefixRow(row,old){
     const inp=el("input"); inp.value=old;
@@ -1467,6 +1498,7 @@
       $("rgModalTitle").textContent=d.name+" 前缀列表（"+d.prefixes_count+" 条）";
       $("rgModal").classList.remove("hidden");
       $("rgFilter").value="";
+      RG_SHOW=200;
       renderRgList();
     }).catch(function(e){appendLog("❌ 加载前缀列表失败: "+e.message);});
   }
@@ -1497,6 +1529,37 @@
   function updPrefix(oldp,newp){
     if(!newp||!oldp){appendLog("⚠️ 前缀不能为空");toast("前缀不能为空","warn");return;}
     post("/api/routegroups",{action:"update_prefix",id:curRg,old_prefix:oldp,new_prefix:newp}).then(afterRgChange);
+  }
+
+  // ---------- exabgp.conf 预览 / 配置漂移 ----------
+  let CONF_TEXT = "";
+  async function loadConf(){
+    try{
+      const r=await fetch(api("/api/conf?diff=1"));
+      if(r.status===401){ needToken(); return; }
+      const d=await r.json();
+      const pre=$("confPre"); pre.innerHTML="";
+      const st=$("confState");
+      if(d.status!=="ok"){ st.textContent=d.msg||"读取失败"; st.style.color="var(--red)"; return; }
+      CONF_TEXT = d.rendered || "";
+      if(d.same){
+        st.textContent="✅ 磁盘上的 exabgp.conf 与当前配置一致";
+        st.style.color="var(--green)";
+        pre.textContent = CONF_TEXT;
+      }else{
+        st.textContent="⚠️ 检测到配置漂移（磁盘文件与当前配置不一致，共 "+(d.diff||[]).length+" 行差异）";
+        st.style.color="var(--amber)";
+        (d.diff||[]).forEach(function(line){
+          let cls="";
+          if(line.indexOf("@@")===0 || line.indexOf("+++")===0 || line.indexOf("---")===0) cls="hunk";
+          else if(line.charAt(0)==="+") cls="add";
+          else if(line.charAt(0)==="-") cls="del";
+          const row=el("div",cls); row.textContent=line===""?" ":line;
+          pre.appendChild(row);
+        });
+      }
+      $("confModal").classList.remove("hidden");
+    }catch(e){ toast("读取配置失败："+e.message,"err"); }
   }
 
   // ---------- 操作审计 ----------
@@ -1563,6 +1626,14 @@
 
   // 全局搜索
   // 审计 / 令牌
+  $("btnConf").onclick=loadConf;
+  $("confClose").onclick=function(){ $("confModal").classList.add("hidden"); };
+  $("confReload").onclick=loadConf;
+  $("confCopy").onclick=function(){
+    if(!CONF_TEXT){ toast("还没有内容可复制","warn"); return; }
+    navigator.clipboard.writeText(CONF_TEXT).then(function(){ toast("已复制 exabgp.conf 全文","ok"); },
+      function(){ toast("复制失败，请手动选择","err"); });
+  };
   $("btnAudit").onclick=function(){ $("auditModal").classList.remove("hidden"); loadAudit(); };
   $("auditClose").onclick=function(){ $("auditModal").classList.add("hidden"); };
   $("auditRefresh").onclick=loadAudit;
