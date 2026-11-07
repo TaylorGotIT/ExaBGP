@@ -566,6 +566,12 @@ def load_config():
                 "next_hop": rg.get("next_hop", ""), "community": rg.get("community", ""),
                 "med": str(rg.get("med", "") or ""), "prepend": int(rg.get("prepend", 0) or 0),
             }
+        # 自愈：清掉指向已不存在分组的绑定（例如旧配置里删过组）
+        for s in SOURCES.values():
+            bad = [gid for gid in (s.get("groups") or []) if gid not in GROUPS]
+            if bad:
+                s["groups"] = [gid for gid in (s.get("groups") or []) if gid in GROUPS]
+                log(f"⚠️ 数据源 [{s['name']}] 存在失效的分组绑定 {bad}，已清理")
         # 恢复路由组前缀集合
         for rgid in list(ROUTE_GROUPS):
             p = routegroup_path(rgid)
@@ -1260,6 +1266,12 @@ class GroupsApiHandler(BaseHandler):
                 gid = data["id"]
                 if gid not in GROUPS:
                     raise ValueError(f"分组 {gid} 不存在")
+                # 引用检查：被数据源绑定的分组不能直接删，否则源会变成"绑到不存在的组"而静默停发
+                bound = [s["name"] for s in SOURCES.values() if gid in (s.get("groups") or [])]
+                if bound:
+                    raise ValueError(
+                        f"分组 [{GROUPS[gid]['name']}] 正被数据源 {('、'.join(bound))} 绑定，"
+                        f"请先删除或改绑这些数据源，再删除分组")
                 ioloop.add_callback(_delete_group, gid)
                 self.write({"status": "ok", "id": gid})
             else:
