@@ -303,6 +303,14 @@ def handle_output_line(line):
             st0["adj_rib_out"].append(p)
         st0["updated"] = time.time()
         return
+    m = re.match(r"^neighbor (\S+) (?:ipv4|ipv6) unicast (\S+)(?:\s+next-hop (\S+))?", line)
+    if m:
+        ip, p = m.group(1), m.group(2)
+        st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
+        if p not in st0["adj_rib_out"]:
+            st0["adj_rib_out"].append(p)
+        st0["updated"] = time.time()
+        return
     m = re.match(r"^neighbor (\S+) adj-rib-out (\S+)(\s+.*)?$", line)
     if m:
         ip, p = m.group(1), m.group(2)
@@ -910,6 +918,15 @@ def scheduler_tick():
     if now >= NEIGHBOR_NEXT_POLL:
         NEIGHBOR_NEXT_POLL = now + NEIGHBOR_POLL_INTERVAL
         tornado.ioloop.IOLoop.current().add_callback(poll_neighbor_states)
+
+def neighbor_expected_routes(ip):
+    """按分组配置推算该邻居应发布的条数（没有 adj-rib-out 快照时兜底）"""
+    total = set()
+    for g in GROUPS.values():
+        if not g["enabled"] or ip not in g.get("neighbors", []):
+            continue
+        total |= routes_for_group(g["id"])
+    return len(total)
 
 # ============ 启动自愈 ============
 async def announce_union_to_groups(only_id=None):
@@ -1576,10 +1593,16 @@ class NeighborsHandler(BaseHandler):
         now = time.time()
         out = {}
         for ip, st in NEIGHBOR_STATES.items():
+            adj = st.get("adj_rib_out", [])
+            if adj:
+                rib, src = len(adj), "adj-rib"
+            else:
+                rib, src = neighbor_expected_routes(ip), "model"
             out[ip] = {
                 "state": st.get("state", "unknown"),
-                "rib_count": len(st.get("adj_rib_out", [])),
-                "adj_rib_out": st.get("adj_rib_out", []),
+                "rib_count": rib,
+                "rib_count_src": src,
+                "adj_rib_out": adj,
                 "updated": st.get("updated", 0),
                 "age": int(now - st.get("updated", now)),
             }

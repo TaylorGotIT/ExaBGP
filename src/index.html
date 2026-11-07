@@ -1339,7 +1339,14 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     cs.appendChild(se); r.appendChild(cs);
     const rc=Number(st.rib_count||0);
     const ribCell=cell("num", rc>0 ? (rc+" 条") : "—");
-    if(rc===0){ ribCell.title="未采集到 adj-rib-out 明细（点 adj-rib-out 查看实际发布表）；不代表没有发布"; }
+    if(st.rib_count_src==="model"){
+      ribCell.title="按分组配置计算（"+rc+" 条）；点 adj-rib-out 可拉取 exabgp 实际发布表";
+      ribCell.style.color="var(--muted)";
+    }else if(rc>0){
+      ribCell.title="exabgp adj-rib-out 实际快照";
+    }else{
+      ribCell.title="当前没有可发布的路由";
+    }
     r.appendChild(ribCell);
     r.appendChild(cell("num",(st.age==null?"–":st.age+"s 前")));
     const ca=cell("act");
