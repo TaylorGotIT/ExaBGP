@@ -75,7 +75,11 @@ docker ps --filter "name=^${NAME}$" --format '{{.Names}} | {{.Image}} | {{.Statu
 echo "--- 状态 ---"
 curl -fsS "http://127.0.0.1:$PORT/api/status" | head -c 320; echo
 echo "--- 缓存头 ---"
-curl -sI "http://127.0.0.1:$PORT/index.html" | grep -i '^cache-control' || echo "（无 Cache-Control，旧版本镜像？）"
+if curl -s -D - -o /dev/null "http://127.0.0.1:$PORT/index.html" | grep -qi '^cache-control:.*no-cache'; then
+  echo "OK：Cache-Control 已禁止缓存"
+else
+  echo "WARN：没有 no-cache 头（镜像可能未更新）"
+fi
 echo "--- 页面 favicon ---"
 if curl -s "http://127.0.0.1:$PORT/index.html" | grep -q 'rel="icon"'; then
   echo "OK：页面内联 favicon 存在"
