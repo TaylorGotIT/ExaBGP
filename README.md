@@ -172,4 +172,4 @@ docker run -d --name exabgp-v6 --network host \
 
 ---
 
-<sub>图标：`assets/icon.svg`（Python 蛇 + Web 控制台 + BGP 路由宣告），可直接用于文档、镜像标注与 favicon。</sub>
+<sub>图标说明：地球经纬网格（区域 / 全球 IP 网络）+ Python 蛇（自动化采集）+ 虚线宣告箭头与 `BGP` 会话标签（把路由播给 CE）+ 控制台窗口（WebUI）。源文件 `assets/icon.svg`，可直接用于文档、镜像标注与 favicon。</sub>
