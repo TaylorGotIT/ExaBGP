@@ -715,7 +715,13 @@ def download_url(url):
     out = set()
     for line in lines:
         line = line.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith("#") or line.startswith(";"):
+            continue
+        # 行内注释：Spamhaus DROP 用 "1.2.3.0/24 ; SBL123" 这种格式
+        for sep in (";", " #", "\t#"):
+            if sep in line:
+                line = line.split(sep, 1)[0].strip()
+        if not line:
             continue
         if "/" not in line:
             try:

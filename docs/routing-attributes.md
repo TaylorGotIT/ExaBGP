@@ -182,7 +182,27 @@ bgp 65001
 
 策略节点顺序很关键：黑洞节点必须在正常策略**前面**。
 
-### 7.4 注意事项
+### 7.4 常用开源黑名单源（2026-11 实测可拉取）
+
+| 来源 | URL | 格式 | 条目数 | 说明 |
+|---|---|---|---|---|
+| **Spamhaus DROP** | `https://www.spamhaus.org/drop/drop.txt` | CIDR + `;` 行内注释 | ~1.76k | 最常用，整段/子网级；需遵守 Spamhaus 条款 |
+| **FireHOL level1** | `https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset` | CIDR | ~4.65k | 聚合多个公开名单，适合直接做 RTBH |
+| **ET Compromised IPs** | `https://rules.emergingthreats.net/blockrules/compromised-ips.txt` | 纯 IP | ~0.5k | 量小、变动慢；ET Open 商用需授权 |
+| **CINS Army** | `https://cinsscore.com/list/ci-badguys.txt` | 纯 IP | ~15k | 量大，建议先白名单过滤 |
+| **blocklist.de all** | `https://lists.blocklist.de/lists/all.txt` | 纯 IP | ~26k | 量很大，建议改用其分类子集（如 `ssh.txt`） |
+| **GreenSnow** | `https://blocklist.greensnow.co/greensnow.txt` | 纯 IP | ~2.8k | 免费，更新快 |
+| abuse.ch（Feodo/URLhaus） | `https://feodotracker.abuse.ch/downloads/ipblocklist.txt` | 纯 IP | — | **2024 起需要 Auth-Key**，匿名访问返回错误页 |
+
+> 解析器已兼容：`#` / `;` 注释行、行内 `;` 注释、裸 IP 自动补 `/32`、主机位归一。
+
+**选型建议**
+
+- 追求稳：**Spamhaus DROP**（1.7k，前缀级，UPDATE 量小）
+- 覆盖面：**FireHOL level1**（4.6k，已聚合去重）
+- 不要直接把 15k~26k 的纯 IP 列表全量灌进去——CE 的 RIB 和 BGP UPDATE 会明显吃紧，建议先做白名单过滤 + 相邻前缀归并。
+
+### 7.5 注意事项
 
 - **白名单/重叠**：黑名单 IP 若落在正常宣告的大段里，会把整个段黑洞掉；上线前先做重叠检查。
 - **名单规模与抖动**：几千条 /32 且高频变化会产生大量 UPDATE，建议对名单做去重、相邻前缀归并、变更限速。
