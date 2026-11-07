@@ -1,6 +1,6 @@
 # 控制台使用手册
 
-控制台是单文件页面（`v6/index.html`），随镜像发布，地址：`http://<宿主机IP>:9550/index.html`。
+控制台是单文件页面（`src/index.html`），随镜像发布，地址：`http://<宿主机IP>:9550/index.html`。
 
 ![控制台](images/console.png)
 

@@ -6,9 +6,9 @@
 
 **多源采集 · 分组传播 · 可视化下发 · 为 BGP 选路而生的路由注入平台**
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](v6/http_api.py)
-[![ExaBGP](https://img.shields.io/badge/ExaBGP-4.2.11-2dd4a7)](v6/Dockerfile)
-[![Web UI](https://img.shields.io/badge/Web%20UI-Tornado%20%2B%20SSE-6d8dff)](v6/index.html)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](src/http_api.py)
+[![ExaBGP](https://img.shields.io/badge/ExaBGP-4.2.11-2dd4a7)](src/Dockerfile)
+[![Web UI](https://img.shields.io/badge/Web%20UI-Tornado%20%2B%20SSE-6d8dff)](src/index.html)
 [![Docker](https://img.shields.io/badge/Docker-one--liner-2496ED?logo=docker&logoColor=white)](docs/deployment.md)
 
 </div>
@@ -82,7 +82,7 @@ KPI 概览 · 邻居监控（含逐邻居命令与回显）· 实时日志 · �
 ```bash
 # 1) 构建镜像
 git clone https://github.com/TaylorGotIT/ExaBGP.git && cd ExaBGP
-docker build -t exabgp:v6 ./v6
+docker build -t exabgp:v6 ./src
 
 # 2) 启动（--network host 是必须的：BGP 179 + 控制台 9550 + exabgp FIFO）
 docker run -d --name exabgp-v6 --network host \
@@ -128,7 +128,7 @@ docker run -d --name exabgp-v6 --network host \
 │   ├── troubleshooting.md       # 常见问题与排错
 │   ├── changelog.md             # 版本演进
 │   └── images/                  # 文档插图
-└── v6/                          # 当前版本实现
+└── src/                         # 当前版本实现
     ├── Dockerfile               # python:3.11-slim + exabgp 4.2.11 + tzdata
     ├── entrypoint.sh            # 初始化 FIFO → 生成 conf → 启动 exabgp(PID1)
     ├── confgen.py               # 按分组渲染 exabgp.conf

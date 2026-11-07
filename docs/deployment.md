@@ -18,7 +18,7 @@
 ```bash
 git clone https://github.com/TaylorGotIT/ExaBGP.git
 cd ExaBGP
-docker build -t exabgp:v6 ./v6
+docker build -t exabgp:v6 ./src
 ```
 
 镜像基于 `python:3.11-slim`，构建时会：
@@ -66,7 +66,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9550/health
 
 ```bash
 # 升级：重新 build 后跑一个新容器，旧容器改名留作回滚
-docker build --network host -t exabgp:v6 ./v6
+docker build --network host -t exabgp:v6 ./src
 docker stop exabgp-v6 && docker rename exabgp-v6 exabgp-v6-prev
 docker run -d --name exabgp-v6 ...（同上）  exabgp:v6
 
@@ -109,7 +109,7 @@ docker rename exabgp-v6-prev exabgp-v6 && docker start exabgp-v6
 ```bash
 apt-get update && apt-get install -y python3 python3-pip
 pip3 install "exabgp==4.2.11" tornado
-mkdir -p /exabgp && cp -r v6/* /exabgp/
+mkdir -p /exabgp && cp -r src/* /exabgp/
 mkdir -p /exabgp/data /run/exabgp /etc/exabgp
 cp /exabgp/exabgp.env /etc/exabgp/exabgp.env
 chmod +x /exabgp/entrypoint.sh

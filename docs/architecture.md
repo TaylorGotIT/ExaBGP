@@ -17,10 +17,10 @@ ExaBGP v6 是一个**路由注入平台**，不是完整的路由协议栈实现
 | 组件 | 文件 | 职责 |
 |---|---|---|
 | BGP 引擎 | 镜像内 `exabgp 4.2.11` | 持有 BGP 会话（PID 1）、收发 UPDATE |
-| 控制面 | `v6/http_api.py` | 调度、采集、差分、命令下发、REST、SSE |
-| 配置生成 | `v6/confgen.py` | 把 `runtime_config.json` 渲染成 `exabgp.conf` 的 `neighbor` 块 |
-| 控制台 | `v6/index.html` | 单文件前端（无构建链），轮询 + SSE |
-| 启动器 | `v6/entrypoint.sh` | 建 FIFO → 生成 conf → `exec exabgp` |
+| 控制面 | `src/http_api.py` | 调度、采集、差分、命令下发、REST、SSE |
+| 配置生成 | `src/confgen.py` | 把 `runtime_config.json` 渲染成 `exabgp.conf` 的 `neighbor` 块 |
+| 控制台 | `src/index.html` | 单文件前端（无构建链），轮询 + SSE |
+| 启动器 | `src/entrypoint.sh` | 建 FIFO → 生成 conf → `exec exabgp` |
 
 三者的关系：
 
