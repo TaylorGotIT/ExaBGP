@@ -21,7 +21,7 @@ EXABGP_VER=4.2.11
 PYPI_INDEX="${PYPI_INDEX:-}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$HERE/../src"
+SRC_DIR="$HERE/../../src"   # 包里 src 与 packaging 同级
 
 info()  { printf '\033[36m==> %s\033[0m\n' "$*"; }
 warn()  { printf '\033[33m!! %s\033[0m\n' "$*"; }
