@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ExaBGP">
+  <title>ExaBGP</title>
+  <desc>ExaBGP 路由引擎徽标：Python 蛇 + Web 控制台 + BGP 路由宣告</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="0.55" stop-color="#111b30"/>
+      <stop offset="1" stop-color="#18233d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#6d8dff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#6d8dff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="snake" x1="0.05" y1="0.9" x2="0.95" y2="0.2">
+      <stop offset="0" stop-color="#19a97f"/>
+      <stop offset="0.45" stop-color="#2dd4a7"/>
+      <stop offset="1" stop-color="#5cc8f5"/>
+    </linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2745"/>
+      <stop offset="1" stop-color="#121b2e"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6d8dff"/>
+      <stop offset="1" stop-color="#5cc8f5"/>
+    </linearGradient>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="#8ea0c0" opacity="0.10"/>
+    </pattern>
+    <clipPath id="winClip"><rect x="116" y="288" width="280" height="166" rx="26"/></clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#dots)"/>
+  <circle cx="256" cy="230" r="215" fill="url(#glow)"/>
+
+  <!-- 蛇身（尾部随后被控制台窗口遮住，形成"从面板里生成路由"的观感） -->
+  <path d="M 131.8 316.9 L 131.0 311.7 L 130.0 306.6 L 129.1 301.5 L 128.2 296.5 L 127.3 291.6 L 126.6 286.7 L 125.9 281.8 L 125.3 277.0 L 124.9 272.3 L 124.5 267.6 L 124.1 263.0 L 123.9 258.5 L 123.8 254.0 L 123.8 249.6 L 123.9 245.3 L 124.0 241.1 L 124.3 237.0 L 124.6 233.0 L 125.1 229.1 L 125.7 225.3 L 126.3 221.6 L 127.1 218.0 L 127.9 214.6 L 128.8 211.2 L 129.8 208.1 L 131.0 205.0 L 132.2 202.1 L 133.5 199.4 L 134.8 196.7 L 136.3 194.3 L 137.8 192.0 L 139.4 189.8 L 141.1 187.8 L 142.8 186.0 L 144.6 184.3 L 146.5 182.8 L 148.4 181.3 L 150.4 180.1 L 152.5 178.9 L 154.7 178.0 L 157.6 176.5 L 159.7 175.5 L 161.8 174.7 L 164.1 173.9 L 166.5 173.2 L 168.9 172.5 L 171.5 171.9 L 174.1 171.4 L 176.8 171.0 L 179.6 170.7 L 182.4 170.4 L 185.3 170.2 L 188.3 170.1 L 191.4 170.1 L 194.5 170.1 L 197.7 170.2 L 200.9 170.4 L 204.2 170.6 L 207.5 171.0 L 210.9 171.3 L 214.3 171.8 L 217.7 172.3 L 221.2 172.9 L 224.7 173.6 L 228.2 174.3 L 231.8 175.0 L 235.3 175.9 L 238.9 176.8 L 242.5 177.7 L 246.2 178.7 L 249.8 179.7 L 253.4 180.8 L 257.0 182.0 L 260.7 183.2 L 264.3 184.4 L 267.9 185.7 L 271.5 187.0 L 275.1 188.4 L 278.6 189.8 L 282.2 191.2 L 285.7 192.7 L 289.2 194.2 L 292.6 195.7 L 296.0 197.2 L 299.4 198.8 L 302.8 200.4 L 306.1 202.1 L 309.3 203.7 L 312.5 205.4 L 315.7 207.1 L 318.8 208.8 L 321.8 210.5 L 324.8 212.2 L 327.7 213.9 L 330.5 215.7 L 333.2 217.4 L 335.9 219.1 L 338.5 220.9 L 341.0 222.6 L 343.5 224.3 L 360.5 199.7 L 357.7 197.8 L 354.8 195.9 L 351.8 194.1 L 348.7 192.2 L 345.5 190.4 L 342.3 188.6 L 339.1 186.8 L 335.8 185.0 L 332.4 183.3 L 329.0 181.5 L 325.5 179.8 L 321.9 178.1 L 318.4 176.4 L 314.7 174.8 L 311.1 173.2 L 307.4 171.6 L 303.6 170.0 L 299.8 168.5 L 296.0 167.0 L 292.2 165.5 L 288.3 164.1 L 284.5 162.7 L 280.6 161.4 L 276.6 160.1 L 272.7 158.9 L 268.7 157.6 L 264.8 156.5 L 260.8 155.4 L 256.8 154.3 L 252.8 153.3 L 248.9 152.4 L 244.9 151.5 L 240.9 150.6 L 236.9 149.8 L 233.0 149.1 L 229.0 148.5 L 225.1 147.9 L 221.2 147.4 L 217.3 146.9 L 213.4 146.6 L 209.6 146.3 L 205.8 146.1 L 202.0 145.9 L 198.2 145.9 L 194.5 145.9 L 190.8 146.0 L 187.2 146.2 L 183.5 146.5 L 180.0 146.9 L 176.5 147.4 L 173.0 148.0 L 169.6 148.7 L 166.2 149.5 L 162.9 150.4 L 159.6 151.4 L 156.5 152.6 L 153.3 153.9 L 150.3 155.3 L 147.3 156.8 L 145.3 158.0 L 141.9 159.9 L 138.7 162.0 L 135.6 164.3 L 132.8 166.7 L 130.1 169.3 L 127.5 172.1 L 125.2 175.1 L 123.0 178.1 L 121.0 181.3 L 119.2 184.7 L 117.5 188.1 L 116.0 191.6 L 114.6 195.3 L 113.4 199.0 L 112.3 202.8 L 111.3 206.7 L 110.5 210.7 L 109.8 214.8 L 109.3 219.0 L 108.8 223.2 L 108.5 227.5 L 108.3 231.9 L 108.3 236.4 L 108.3 240.9 L 108.4 245.5 L 108.7 250.1 L 109.1 254.8 L 109.6 259.6 L 110.2 264.4 L 110.9 269.2 L 111.7 274.1 L 112.6 279.0 L 113.6 284.0 L 114.7 288.9 L 116.0 294.0 L 117.3 299.0 L 118.8 304.0 L 120.3 309.1 L 122.1 314.1 L 124.2 319.1 Z" fill="url(#snake)"/>
+  <circle cx="127.7" cy="189.5" r="2.9" fill="#0b1220" opacity="0.15"/><circle cx="165.9" cy="161.5" r="3.4" fill="#0b1220" opacity="0.15"/><circle cx="219.5" cy="159.9" r="3.8" fill="#0b1220" opacity="0.15"/><circle cx="279.8" cy="175.6" r="4.1" fill="#0b1220" opacity="0.15"/>
+
+  <!-- 控制台窗口 -->
+  <g>
+    <rect x="116" y="288" width="280" height="166" rx="26" fill="url(#win)" stroke="#2e4066" stroke-width="6"/>
+    <g clip-path="url(#winClip)">
+      <rect x="116" y="288" width="280" height="44" fill="#1d2947"/>
+      <circle cx="150" cy="310" r="6.4" fill="#f4716e"/>
+      <circle cx="172" cy="310" r="6.4" fill="#f5b85c"/>
+      <circle cx="194" cy="310" r="6.4" fill="#2dd4a7"/>
+      <rect x="140" y="354" width="126" height="11" rx="5.5" fill="#33456b"/>
+      <rect x="140" y="378" width="188" height="11" rx="5.5" fill="#2b3a5c"/>
+      <rect x="140" y="402" width="104" height="11" rx="5.5" fill="#2b3a5c"/>
+      <path d="M300 430 L324 404 L344 416 L374 376" fill="none" stroke="url(#bar)" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="374" cy="376" r="7" fill="#5cc8f5"/>
+    </g>
+  </g>
+
+  <!-- 蛇头 -->
+  <g transform="rotate(18 372 216)">
+    <ellipse cx="372" cy="216" rx="31" ry="23" fill="url(#snake)"/>
+    <ellipse cx="384" cy="208" rx="8.5" ry="8.5" fill="#ffffff"/>
+    <ellipse cx="386" cy="208" rx="4" ry="4" fill="#0b1220"/>
+  </g>
+  <path d="M398 224 L418 215 M398 224 L418 233" stroke="#f4716e" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+
+  <!-- BGP 路由宣告 -->
+  <path d="M15 0 L-9 11 L-9 -11 Z" fill="#5cc8f5" opacity="1.0" transform="translate(424,182) rotate(-45)"/><path d="M13 0 L-8 10 L-8 -10 Z" fill="#5cc8f5" opacity="0.72" transform="translate(452,156) rotate(-45)"/><path d="M11 0 L-7 8 L-7 -8 Z" fill="#5cc8f5" opacity="0.5" transform="translate(480,130) rotate(-45)"/>
+</svg>
