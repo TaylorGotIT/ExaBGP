@@ -336,6 +336,37 @@
     </div>
   </section>
 
+
+<section class="panel">
+    <div class="panel-head">
+      <h2>分组邻居传播</h2>
+      <span class="hint">组名自定义 · 邻居 IP 逗号分隔多个 · 分组变更自动重生成 exabgp.conf 并热重载</span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <colgroup>
+          <col style="width:11%"><col style="width:36%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:5%"><col style="width:11%">
+        </colgroup>
+        <thead>
+          <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
+        </thead>
+        <tbody id="grpList"></tbody>
+        <tfoot>
+          <tr>
+            <td><input id="addGrpName" placeholder="60001A"></td>
+            <td><input id="addGrpNeighbors" placeholder="192.168.75.242,192.168.75.243"></td>
+            <td><input id="addGrpNh" placeholder="10.255.0.1"></td>
+            <td><input id="addGrpComm" placeholder="65000:200"></td>
+            <td><input id="addGrpMed" type="number" min="0" class="num-c" placeholder="留空"></td>
+            <td><input id="addGrpPrepend" type="number" min="0" max="10" class="num-c" value="0"></td>
+            <td class="ctr"><input id="addGrpEnabled" type="checkbox" class="chk" checked></td>
+            <td class="act"><button id="btnAddGrp" class="primary sm">添加组</button></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="panel-head">
       <h2>IP 路由组</h2>
@@ -381,37 +412,7 @@
     </div>
   </section>
 
-  <section class="panel">
-    <div class="panel-head">
-      <h2>分组邻居传播</h2>
-      <span class="hint">组名自定义 · 邻居 IP 逗号分隔多个 · 分组变更自动重生成 exabgp.conf 并热重载</span>
-    </div>
-    <div class="tbl-wrap">
-      <table class="tbl">
-        <colgroup>
-          <col style="width:11%"><col style="width:36%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:7%"><col style="width:5%"><col style="width:11%">
-        </colgroup>
-        <thead>
-          <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
-        </thead>
-        <tbody id="grpList"></tbody>
-        <tfoot>
-          <tr>
-            <td><input id="addGrpName" placeholder="60001A"></td>
-            <td><input id="addGrpNeighbors" placeholder="192.168.75.242,192.168.75.243"></td>
-            <td><input id="addGrpNh" placeholder="10.255.0.1"></td>
-            <td><input id="addGrpComm" placeholder="65000:200"></td>
-            <td><input id="addGrpMed" type="number" min="0" class="num-c" placeholder="留空"></td>
-            <td><input id="addGrpPrepend" type="number" min="0" max="10" class="num-c" value="0"></td>
-            <td class="ctr"><input id="addGrpEnabled" type="checkbox" class="chk" checked></td>
-            <td class="act"><button id="btnAddGrp" class="primary sm">添加组</button></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </section>
-
-  <div class="split">
+    <div class="split">
     <section class="panel">
       <div class="panel-head"><h2>手动发布 / 撤回</h2></div>
       <div class="panel-body">

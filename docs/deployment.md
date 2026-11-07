@@ -96,7 +96,7 @@ docker rename exabgp-v6-prev exabgp-v6 && docker start exabgp-v6
 | `TARGET_NEIGHBOR` | `192.168.75.241` | 默认分组邻居 IP |
 | `NEXT_HOP` | `192.168.75.244` | 默认下一跳（同时作为 `local-address`/`router-id` 的默认值） |
 | `ROUTE_COMMUNITY` | `65000:100` | 默认 community |
-| `REFRESH_INTERVAL` | `86400` | 默认源更新间隔（秒），最小 10 |
+| `REFRESH_INTERVAL` | `3600` | 默认源更新间隔（秒），最小 10；默认 1 小时 |
 | `LOCAL_AS` | `65000` | 邻居 `local-as` 默认值；`AS-PATH prepend` 也用它 |
 | `PEER_AS` | `65001` | 邻居 `peer-as` 默认值 |
 | `LOCAL_ADDRESS` | `= NEXT_HOP` | 邻居 `local-address` 默认值 |

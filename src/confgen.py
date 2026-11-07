@@ -36,9 +36,9 @@ def default_paths():
 def bootstrap_defaults(config_file):
     """首次运行（无配置文件）时，从环境变量建立默认源 + 默认组（与 http_api 引导逻辑一致）"""
     try:
-        interval = int(os.environ.get("REFRESH_INTERVAL", "86400"))
+        interval = int(os.environ.get("REFRESH_INTERVAL", "3600"))
     except ValueError:
-        interval = 86400
+        interval = 3600
     data = {
         "sources": [{
             "id": "s1",

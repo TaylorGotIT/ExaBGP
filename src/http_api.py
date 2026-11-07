@@ -423,7 +423,7 @@ def load_config():
         for s in cfg.get("sources", []):
             SOURCES[s["id"]] = {
                 "id": s["id"], "name": s.get("name", s["url"]), "url": s["url"],
-                "interval": max(10, int(s.get("interval", 86400))),
+                "interval": max(10, int(s.get("interval", 3600))),
                 "enabled": bool(s.get("enabled", True)),
                 "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
             }
@@ -470,9 +470,9 @@ def bootstrap_defaults():
     """首次运行：从环境变量建立默认源 + 默认组（兼容 v5）"""
     cfg = get_runtime_config()
     try:
-        interval = int(os.environ.get("REFRESH_INTERVAL", "86400"))
+        interval = int(os.environ.get("REFRESH_INTERVAL", "3600"))
     except ValueError:
-        interval = 86400
+        interval = 3600
     interval = max(10, interval)
     SOURCES["s1"] = {
         "id": "s1", "name": "默认源", "url": cfg["DATA_URL"], "interval": interval,
@@ -916,7 +916,7 @@ class SourcesApiHandler(BaseHandler):
                 sid = "s" + uuid.uuid4().hex[:6]
                 SOURCES[sid] = {
                     "id": sid, "name": str(data.get("name") or url),
-                    "url": url, "interval": max(10, int(data.get("interval", 86400))),
+                    "url": url, "interval": max(10, int(data.get("interval", 3600))),
                     "enabled": bool(data.get("enabled", True)),
                     "routes": set(), "last_status": "未执行", "last_time": "N/A", "next_due": 0,
                 }
