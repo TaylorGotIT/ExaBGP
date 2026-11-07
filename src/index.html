@@ -360,10 +360,10 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     <div class="tbl-wrap">
       <table class="tbl">
         <colgroup>
-          <col style="width:10%"><col style="width:31%"><col style="width:11%"><col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:15%">
+          <col style="width:10%"><col style="width:33%"><col style="width:11%"><col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:5%"><col style="width:17%">
         </colgroup>
         <thead>
-          <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="ctr">隔离</th><th class="act">操作</th></tr>
+          <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
         </thead>
         <tbody id="grpList"></tbody>
         <tfoot>
@@ -375,7 +375,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
             <td><input id="addGrpMed" type="number" min="0" class="num-c" placeholder="留空"></td>
             <td><input id="addGrpPrepend" type="number" min="0" max="10" class="num-c" value="0"></td>
             <td class="ctr"><input id="addGrpEnabled" type="checkbox" class="chk" checked></td>
-            <td class="ctr"><input id="addGrpIsolated" type="checkbox" class="chk" title="隔离组：只接收显式绑定到本组的数据源"></td>
             <td class="act"><button id="btnAddGrp" class="primary sm">添加组</button></td>
           </tr>
         </tfoot>
@@ -937,7 +936,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     if(!tr)return obj;
     tr.querySelectorAll("[data-k]").forEach(function(inp){
       const k=inp.dataset.k;
-      if(k==="enabled"||k==="isolated")obj[k]=inp.checked;
+      if(k==="enabled")obj[k]=inp.checked;
       else if(k==="interval")obj[k]=parseInt(inp.value,10);
       else if(k==="prepend")obj[k]=inp.value===""?0:(parseInt(inp.value,10)||0);
       else obj[k]=inp.value.trim();
@@ -1010,11 +1009,11 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   // ---------- 分组表 ----------
   function renderGroups(){
     const body=$("grpList"); body.innerHTML="";
-    if(!GROUPS.length){body.appendChild(emptyRow(9,"暂无分组，请在下方添加。"));return;}
+    if(!GROUPS.length){body.appendChild(emptyRow(8,"暂无分组，请在下方添加。"));return;}
     const rows=applySort(
       GROUPS.filter(function(g){return hitQ(g.name,(g.neighbors||[]).join(","),g.next_hop,g.community);}),
       "grp",{name:function(g){return g.name;}});
-    if(!rows.length){body.appendChild(emptyRow(9,"没有匹配「"+SEARCH+"」的分组。"));return;}
+    if(!rows.length){body.appendChild(emptyRow(8,"没有匹配「"+SEARCH+"」的分组。"));return;}
     rows.forEach(function(g){
       const tr=el("tr");
       const nm=el("input"); nm.value=g.name; nm.dataset.k="name"; nm.title=g.name;
@@ -1024,8 +1023,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const md=el("input"); md.type="number"; md.min="0"; md.className="num-c"; md.placeholder="留空"; md.value=g.med||""; md.dataset.k="med";
       const pp=el("input"); pp.type="number"; pp.min="0"; pp.max="10"; pp.className="num-c"; pp.value=(g.prepend||0); pp.dataset.k="prepend";
       const en=el("input"); en.type="checkbox"; en.checked=g.enabled; en.dataset.k="enabled"; en.className="chk";
-      const iso=el("input"); iso.type="checkbox"; iso.checked=!!g.isolated; iso.dataset.k="isolated"; iso.className="chk";
-      iso.title="隔离组：只接收显式绑定到本组的数据源（IPS 黑名单等专用组）";
       const c1=el("td"); c1.appendChild(nm);
       const c2=el("td"); c2.appendChild(nb);
       const c3=el("td"); c3.appendChild(nh);
@@ -1033,12 +1030,11 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const c5=cell("ctr"); c5.appendChild(md);
       const c6=cell("ctr"); c6.appendChild(pp);
       const c7=cell("ctr"); c7.appendChild(en);
-      const c8=cell("ctr"); c8.appendChild(iso);
-      const c9=cell("act");
+      const c8=cell("act");
       const sv=el("button","sm","保存"); sv.onclick=function(){saveGroup(g,tr,sv);};
       const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteGroup(g,dl);};
-      c9.appendChild(sv); c9.appendChild(dl);
-      [c1,c2,c3,c4,c5,c6,c7,c8,c9].forEach(function(c){tr.appendChild(c);});
+      c8.appendChild(sv); c8.appendChild(dl);
+      [c1,c2,c3,c4,c5,c6,c7,c8].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
     });
   }
@@ -1150,11 +1146,10 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       neighbors:$("addGrpNeighbors").value.trim(),next_hop:$("addGrpNh").value.trim(),
       community:$("addGrpComm").value.trim(),
       med:$("addGrpMed").value.trim(),prepend:$("addGrpPrepend").value.trim(),
-      isolated:$("addGrpIsolated").checked,
       enabled:$("addGrpEnabled").checked})
       .then(function(j){ if(!j)return;
         ["addGrpName","addGrpNeighbors","addGrpNh","addGrpComm","addGrpMed","addGrpPrepend"].forEach(function(i){$(i).value="";});
-        $("addGrpPrepend").value="0";$("addGrpEnabled").checked=true;$("addGrpIsolated").checked=false;
+        $("addGrpPrepend").value="0";$("addGrpEnabled").checked=true;
         toast("已添加分组「"+name+"」","ok"); loadStatus(); });
   }
   async function addRouteGroup(){
@@ -1299,7 +1294,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     }
     addItem("","全部组（留空不发指定组）");
     menu.appendChild(el("div","sep"));
-    (GROUPS||[]).forEach(function(g){ addItem(g.id, g.name + (g.isolated?"（隔离）":"")); });
+    (GROUPS||[]).forEach(function(g){ addItem(g.id, g.name); });
 
     btn.onclick=function(e){
       e.stopPropagation();

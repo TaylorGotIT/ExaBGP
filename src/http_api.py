@@ -129,51 +129,10 @@ def calibrate_ips_group():
             g["next_hop"] = IPS_NEXT_HOP; changed = True
         if g.get("community") != IPS_COMMUNITY:
             g["community"] = IPS_COMMUNITY; changed = True
-        if not g.get("isolated"):
-            g["isolated"] = True; changed = True
         if changed:
             save_config()
             log(f"🛡️ 已把分组 [{g['name']}] 校准为固定黑洞属性：下一跳 {IPS_NEXT_HOP} · community {IPS_COMMUNITY}")
 
-def ensure_ips_group():
-    """（历史接口）确保 IPS 分组存在：已存在则校准，不存在则新建"""
-    for x in GROUPS.values():
-        if x.get("ips") or x.get("name") == IPS_GROUP_NAME:
-            calibrate_ips_group()
-            return x["id"]
-    g = None
-    if g is None:
-        donor = None
-        for x in GROUPS.values():
-            if x["enabled"] and not x.get("ips"):
-                donor = x
-                break
-        gid = "gips" + uuid.uuid4().hex[:4]
-        GROUPS[gid] = {
-            "id": gid, "name": IPS_GROUP_NAME,
-            "neighbors": list(donor["neighbors"]) if donor else [],
-            "next_hop": IPS_NEXT_HOP, "community": IPS_COMMUNITY,
-            "isolated": True, "ips": True, "enabled": True,
-            "med": "", "prepend": 0,
-            "local_as": "", "peer_as": "", "local_address": "", "router_id": "",
-        }
-        save_config()
-        tornado.ioloop.IOLoop.current().add_callback(regenerate_conf, "创建 IPS 黑洞分组")
-        tornado.ioloop.IOLoop.current().add_callback(announce_union_to_group, gid)
-        log(f"🛡️ 已创建 IPS 黑洞分组 [{IPS_GROUP_NAME}]：邻居 {GROUPS[gid]['neighbors']} · 下一跳 {IPS_NEXT_HOP} · 属性 {IPS_COMMUNITY}")
-        return gid
-    changed = False
-    if g.get("next_hop") != IPS_NEXT_HOP:
-        g["next_hop"] = IPS_NEXT_HOP; changed = True
-    if g.get("community") != IPS_COMMUNITY:
-        g["community"] = IPS_COMMUNITY; changed = True
-    if not g.get("isolated"):
-        g["isolated"] = True; changed = True
-    if not g.get("ips"):
-        g["ips"] = True; changed = True
-    if changed:
-        save_config()
-    return g["id"]
 
 # ============ 访问令牌 / 角色（未配置 API_TOKEN 时不启用鉴权） ============
 API_TOKEN = os.environ.get("API_TOKEN", "").strip()
@@ -437,28 +396,23 @@ def source_groups(s):
     """该数据源可见的分组：groups 为空 = 全部非隔离的启用分组"""
     bound = s.get("groups") or []
     if not bound:
-        return [g for g in GROUPS.values() if g["enabled"] and not g.get("isolated")]
+        return [g for g in GROUPS.values() if g["enabled"]]
     return [GROUPS[gid] for gid in bound if gid in GROUPS and GROUPS[gid]["enabled"]]
 
 def routes_for_group(gid):
     """某分组实际可见的路由并集。
 
     - 源显式绑定了分组：只有绑定的组可见
-    - 源未绑定（groups 为空）：默认可达所有组，但**隔离组（isolated）除外**
-      （隔离组用于 IPS 黑洞这类必须独占的用途，只接收显式绑定的源）
+    - 源未绑定（groups 为空）：默认可达**所有启用分组**
+    - 因此像 IPS 黑洞这种专用组，务必把其它源显式绑定到各自的组，避免串流
     """
-    g = GROUPS.get(gid)
-    isolated = bool(g and g.get("isolated"))
     u = set()
     for s in SOURCES.values():
         if not s["enabled"]:
             continue
         bound = s.get("groups") or []
-        if bound:
-            if gid not in bound:
-                continue
-        elif isolated:
-            continue
+        if bound and gid not in bound:
+            continue          # 已绑定到别的组，不发给本组
         u |= s["routes"]
     return u
 
@@ -482,7 +436,7 @@ def status_payload():
     grps = [{
         "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
         "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
-        "isolated": bool(g.get("isolated")), "med": g.get("med", ""), "prepend": g.get("prepend", 0),
+        "med": g.get("med", ""), "prepend": g.get("prepend", 0),
     } for g in GROUPS.values()]
     rgs = [{
         "id": rg["id"], "name": rg["name"], "prefixes_count": len(rg["prefixes"]),
@@ -515,7 +469,7 @@ def save_config():
             "groups": [{
                 "id": g["id"], "name": g["name"], "neighbors": g["neighbors"],
                 "next_hop": g["next_hop"], "community": g["community"], "enabled": g["enabled"],
-                "isolated": bool(g.get("isolated")), "med": g.get("med", ""), "prepend": g.get("prepend", 0),
+                "med": g.get("med", ""), "prepend": g.get("prepend", 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
             } for g in GROUPS.values()],
@@ -553,8 +507,6 @@ def load_config():
                 "neighbors": list(g.get("neighbors", [])),
                 "next_hop": g.get("next_hop", ""), "community": g.get("community", ""),
                 "enabled": bool(g.get("enabled", True)),
-                "isolated": bool(g.get("isolated", False)),
-                "ips": bool(g.get("ips", False)),
                 "med": str(g.get("med", "") or ""), "prepend": int(g.get("prepend", 0) or 0),
                 "local_as": g.get("local_as", ""), "peer_as": g.get("peer_as", ""),
                 "local_address": g.get("local_address", ""), "router_id": g.get("router_id", ""),
@@ -961,11 +913,20 @@ def scheduler_tick():
 
 # ============ 启动自愈 ============
 async def announce_union_to_groups(only_id=None):
-    """把全库路由宣告到（指定）启用组：用于开机自愈回填 / 组重新启用"""
-    prefixes = union_routes()
-    if only_id is None and prefixes:
-        log(f"⚡⚡ [🔥高可靠自愈] 开机 0.5s 回填 {len(prefixes)} 条旧路由到全部启用组")
-    await write_announces(prefixes, only_id=only_id)
+    """把每个分组自己可见的源并集宣告给它：用于开机自愈回填 / 组重新启用
+
+    必须按组分别取并集——不同源可以绑定到不同组（如 IPS 黑洞），
+    用全库并集回填会把不该发的路由（含黑洞属性）灌进不该收的组。
+    """
+    total = 0
+    for g in selected_groups(only_id):
+        prefixes = routes_for_group(g["id"])
+        if not prefixes:
+            continue
+        total += len(prefixes)
+        await write_announces(prefixes, only_id=g["id"])
+    if only_id is None and total:
+        log(f"⚡⚡ [🔥高可靠自愈] 开机回填完成：按分组可见并集共 {total} 条")
 
 def restore_sources_from_disk():
     for sid, s in SOURCES.items():
@@ -1184,7 +1145,6 @@ class GroupsApiHandler(BaseHandler):
                     "id": gid, "name": name, "neighbors": neighbors,
                     "next_hop": str(data.get("next_hop", "")).strip(),
                     "community": str(data.get("community", "")).strip(),
-                    "isolated": bool(data.get("isolated", False)),
                     "med": normalize_med(data.get("med")),
                     "prepend": normalize_prepend(data.get("prepend")),
                     "enabled": bool(data.get("enabled", True)),
@@ -1224,12 +1184,6 @@ class GroupsApiHandler(BaseHandler):
                     g["next_hop"] = v
                 if "community" in data:
                     g["community"] = str(data["community"]).strip()
-                if "isolated" in data:
-                    before_iso = bool(g.get("isolated"))
-                    g["isolated"] = bool(data["isolated"])
-                    if before_iso != g["isolated"]:
-                        ioloop.add_callback(announce_union_to_group, gid)
-                        log(f"🔁 分组 [{g['name']}] 隔离属性变更，已按新的可见源重播")
                 if "med" in data:
                     g["med"] = normalize_med(data["med"])
                 if "prepend" in data:
