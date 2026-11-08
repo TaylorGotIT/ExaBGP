@@ -593,20 +593,19 @@ def parse_prefixes_text(text):
     return {p for p in re.split(r"[\s,，;；]+", text or "") if p}
 
 def valid_ipv4(s):
-    """校验是否为合法 IPv4 地址（用于分组邻居/覆盖地址防非法值写入 conf）"""
+    """校验是否为合法 IP 地址（IPv4 或 IPv6，用于分组邻居/下一跳/覆盖地址）"""
     try:
-        return ipaddress.ip_address(s.strip()).version == 4
+        ipaddress.ip_address(str(s).strip())
+        return True
     except ValueError:
         return False
 
 def validate_prefix(p):
-    """校验并规范化 IPv4 前缀（严格模式关：带主机位会自动归一为网络地址）"""
+    """校验并规范化 IP 前缀（IPv4 / IPv6；带主机位自动归一为网络地址）"""
     p = (p or "").strip()
     try:
         net = ipaddress.ip_network(p, strict=False)
     except ValueError:
-        return None
-    if net.version != 4:
         return None
     return str(net)
 
@@ -771,8 +770,8 @@ def download_url(url):
             continue
         if "/" not in line:
             try:
-                ipaddress.ip_address(line)
-                line = line + "/32"          # IPS 黑名单常见裸 IP
+                ip = ipaddress.ip_address(line)
+                line = f"{line}/{'128' if ip.version == 6 else '32'}"   # 裸 IP 按版本补掩码
             except ValueError:
                 continue
         try:
@@ -1155,11 +1154,11 @@ class GroupsApiHandler(BaseHandler):
                     raise ValueError("neighbors 不能为空（逗号分隔多个 IP）")
                 for nb in neighbors:
                     if not valid_ipv4(nb):
-                        raise ValueError(f"邻居 IP 非法: {nb}（须为合法 IPv4 地址，如 192.168.75.241）")
+                        raise ValueError(f"邻居 IP 非法: {nb}（须为合法 IPv4/IPv6 地址，如 192.168.75.241 或 2001:db8::1）")
                 for k, label in (("next_hop", "下一跳"), ("local_address", "本地地址"), ("router_id", "Router-ID")):
                     v = str(data.get(k, "")).strip()
                     if v and not valid_ipv4(v):
-                        raise ValueError(f"{label} 非法: {v}（须为合法 IPv4 地址）")
+                        raise ValueError(f"{label} 非法: {v}（须为合法 IPv4/IPv6 地址）")
                 gid = "g" + uuid.uuid4().hex[:6]
                 GROUPS[gid] = {
                     "id": gid, "name": name, "neighbors": neighbors,

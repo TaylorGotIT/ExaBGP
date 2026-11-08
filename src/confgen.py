@@ -81,18 +81,32 @@ def runtime_defaults():
     }
 
 
+def _ipver(s):
+    try:
+        return __import__("ipaddress").ip_address(str(s).strip()).version
+    except Exception:
+        return 0
+
+
 def neighbor_block(ip, g, runtime):
-    """单个邻居声明块：优先取分组覆盖字段，缺省用环境变量默认值"""
+    """单个邻居声明块：优先取分组覆盖字段，缺省用环境变量默认值
+
+    IPv6 邻居：local-address 必须同为 IPv6，否则省略该行（交给内核选源地址）；
+    router-id 只能是 IPv4，非 v4 时省略（exabgp 自行推导）。
+    """
     las = str(g.get("local_as") or runtime["local_as"])
     pas = str(g.get("peer_as") or runtime["peer_as"])
     rid = str(g.get("router_id") or runtime["router_id"])
     la = str(g.get("local_address") or runtime["local_address"])
     name = g.get("name", g["id"])
+    peer_ver = _ipver(ip)
+    rid_line = f"    router-id {rid};\n" if _ipver(rid) == 4 else ""
+    la_line = f"    local-address {la};\n" if (_ipver(la) == 0 or peer_ver == 0 or _ipver(la) == peer_ver) else ""
     return (
         f"neighbor {ip} {{\n"
         f"    description {name};\n"
-        f"    router-id {rid};\n"
-        f"    local-address {la};\n"
+        f"{rid_line}"
+        f"{la_line}"
         f"    local-as {las};\n"
         f"    peer-as {pas};\n"
         "\n"
@@ -103,6 +117,7 @@ def neighbor_block(ip, g, runtime):
         "\n"
         "    family {\n"
         "        ipv4 unicast;\n"
+        "        ipv6 unicast;\n"
         "    }\n"
         "\n"
         "    static {\n"
@@ -145,8 +160,10 @@ def render_conf_text(config, runtime):
 
 
 def _valid_ipv4(s):
+    """校验合法 IP（IPv4 / IPv6）；名字保留兼容，实际两者都接受"""
     try:
-        return __import__("ipaddress").ip_address(str(s).strip()).version == 4
+        __import__("ipaddress").ip_address(str(s).strip())
+        return True
     except (ValueError, TypeError):
         return False
 

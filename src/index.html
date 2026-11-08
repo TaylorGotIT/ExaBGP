@@ -410,7 +410,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
           <tr>
             <td colspan="8">
               <div class="mini-label">前缀列表 *（手动粘贴，每行一个，如 13.107.6.0/24）</div>
-              <textarea id="addRgPrefixes" rows="2" placeholder="13.107.6.0/24&#10;52.96.0.0/14&#10;10.1.1.1/32"></textarea>
+              <textarea id="addRgPrefixes" rows="2" placeholder="13.107.6.0/24&#10;52.96.0.0/14&#10;2001:db8::/32"></textarea>
             </td>
           </tr>
         </tfoot>
@@ -606,8 +606,11 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const lines=String(text||"").split("\n").map(function(x){return x.trim();}).filter(Boolean);
     const valid=[], invalid=[], dup=[], seen={};
     lines.forEach(function(l){
-      const m=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(l);
-      const ok=m && (+m[1])<256 && (+m[2])<256 && (+m[3])<256 && (+m[4])<256 && (+m[5])<=32;
+      const m4=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(l);
+      const m6=/^([0-9a-fA-F:]+)\/(\d{1,3})$/.exec(l);
+      let ok=false;
+      if(m4){ ok=(+m4[1])<256&&(+m4[2])<256&&(+m4[3])<256&&(+m4[4])<256&&(+m4[5])<=32; }
+      else if(m6){ ok=m6[1].indexOf(":")>=0 && (+m6[2])<=128; }
       if(!ok){ invalid.push(l); return; }
       if(seen[l]){ dup.push(l); return; }
       seen[l]=1; valid.push(l);
@@ -1330,7 +1333,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const ca=cell("act");
     // 前缀查询与其它邻居操作放同一行
     const q=el("div","nbq");
-    const qi=el("input"); qi.type="text"; qi.placeholder="前缀，如 8.221.128.0/20";
+    const qi=el("input"); qi.type="text"; qi.placeholder="前缀，如 8.221.128.0/20 或 2001:db8::/32";
     qi.value=PREFIX_INPUT[ip]!=null?PREFIX_INPUT[ip]:((PREFIX_RESULT[ip]||{}).prefix||"");
     qi.oninput=function(){PREFIX_INPUT[ip]=qi.value;};
     const qb=el("button","sm","查询"); qb.title="查询该前缀是否已发布";
