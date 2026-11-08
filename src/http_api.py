@@ -1576,10 +1576,15 @@ class BulkWithdrawHandler(BaseHandler):
                             "commands": (cmds[:25] + restore_cmds[:25]), "detail": detail})
                 return
             await asyncio.to_thread(write_to_pipe, cmds)
+            if restored:
+                log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，按分组属性回发")
             if restore_cmds:
                 await asyncio.to_thread(write_to_pipe, restore_cmds)
-            if restored:
-                log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，已按分组属性回发")
+                # 把回发的具体命令也打出来，便于核对"到底发了什么属性"
+                for c in restore_cmds[:10]:
+                    log("♻️ " + c.strip())
+                if len(restore_cmds) > 10:
+                    log(f"♻️ … 共 {len(restore_cmds)} 条回发命令（上面列出前 10 条）")
             else:
                 log(f"🗑️ 撤回 {len(withdrawn)} 条")
             sse_broadcast_status()
