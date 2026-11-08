@@ -608,6 +608,25 @@ def valid_ipv4(s):
     except ValueError:
         return False
 
+def ip_version_of(s):
+    try:
+        return ipaddress.ip_address(str(s).strip()).version
+    except ValueError:
+        return 0
+
+def ensure_peer_family(neighbors, local_address):
+    """IPv6 邻居必须配 IPv6 的本地地址，否则 exabgp 起不来（incomplete neighbor）"""
+    la = str(local_address or os.environ.get("LOCAL_ADDRESS") or os.environ.get("NEXT_HOP") or "").strip()
+    la_ver = ip_version_of(la)
+    if not la_ver:
+        return
+    for nb in neighbors:
+        nv = ip_version_of(nb)
+        if nv and nv != la_ver:
+            raise ValueError(
+                f"邻居 {nb} 是 IPv{nv}，但本地地址是 IPv{la_ver}（{la}）；"
+                f"请把该分组的『本地地址』填成 IPv{nv} 地址")
+
 def validate_prefix(p):
     """校验并规范化 IP 前缀（IPv4 / IPv6；带主机位自动归一为网络地址）"""
     p = (p or "").strip()
@@ -1176,6 +1195,7 @@ class GroupsApiHandler(BaseHandler):
                     v = str(data.get(k, "")).strip()
                     if v and not valid_ipv4(v):
                         raise ValueError(f"{label} 非法: {v}（须为合法 IPv4/IPv6 地址）")
+                ensure_peer_family(neighbors, str(data.get("local_address", "")).strip())
                 gid = "g" + uuid.uuid4().hex[:6]
                 GROUPS[gid] = {
                     "id": gid, "name": name, "neighbors": neighbors,
@@ -1247,6 +1267,7 @@ class GroupsApiHandler(BaseHandler):
                 if not just_enabled and g["enabled"] and new_attrs != old_attrs:
                     ioloop.add_callback(announce_union_to_group, gid)
                     log(f"🔁 分组 {g['name']} 属性变更，重播")
+                ensure_peer_family(g["neighbors"], g.get("local_address", ""))
                 save_config()
                 calibrate_ips_group()   # IPS 组固定下一跳/社区，防止被改坏
                 ioloop.add_callback(regenerate_conf, f"更新分组 {g['name']}")

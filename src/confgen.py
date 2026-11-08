@@ -100,8 +100,13 @@ def neighbor_block(ip, g, runtime):
     la = str(g.get("local_address") or runtime["local_address"])
     name = g.get("name", g["id"])
     peer_ver = _ipver(ip)
+    la_ver = _ipver(la)
+    if peer_ver and la_ver and peer_ver != la_ver:
+        raise ValueError(
+            f"邻居 {ip} 是 IPv{peer_ver}，但本地地址是 IPv{la_ver}（{la}）；"
+            f"请在分组里把『本地地址』改成同族地址（IPv{peer_ver}）")
     rid_line = f"    router-id {rid};\n" if _ipver(rid) == 4 else ""
-    la_line = f"    local-address {la};\n" if (_ipver(la) == 0 or peer_ver == 0 or _ipver(la) == peer_ver) else ""
+    la_line = f"    local-address {la};\n"
     return (
         f"neighbor {ip} {{\n"
         f"    description {name};\n"

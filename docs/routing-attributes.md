@@ -226,7 +226,7 @@ bgp 65001
 要点：
 
 - 每个邻居都会声明 `ipv4 unicast` + `ipv6 unicast`；对端不支持 v6 时协商阶段自动只跑 v4，不影响原有会话
-- **IPv6 邻居**：`local-address` 会自动省略（除非你把它配成 IPv6），交给内核选源地址；`router-id` 必须是 IPv4，否则也省略
+- **IPv6 邻居**：必须同时把分组『本地地址』配成 IPv6（exabgp 要求每个邻居都有 local-address，族不一致会报 `incomplete neighbor`）；可以先填 `::` 由内核选源。`router-id` 必须是 IPv4，否则自动省略
 - 在 **IPv4 会话上承载 IPv6 路由** 需要对端支持 Extended Next Hop（RFC 5549）；华为侧对应 `peer <ip> capability-advertise add-path`/`extended-next-hop` 相关配置，不支持时这些 v6 路由不会被接收
 - IPS 黑洞同样适用：v6 名单里的裸地址会自动补 `/128`
 
