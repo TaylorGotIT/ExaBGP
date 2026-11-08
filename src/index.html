@@ -1405,6 +1405,9 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     qi.onkeydown=function(e){if(e.key==="Enter")queryRowPrefix(ip,qi,qr);};
     q.appendChild(qi); q.appendChild(qb); q.appendChild(qr);
     ca.appendChild(q);
+    const vbtn=el("button","sm","核对"); vbtn.title="拉一次发布表快照，并与分组配置比对，找出差异";
+    vbtn.onclick=function(){ verifyNeighbor(ip,vbtn); };
+    ca.appendChild(vbtn);
     [["adj-rib-out","show_adj_rib_out"],["show route","show_route"],["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
       const b=el("button","sm"+(pair[1]==="teardown"?" danger":""),pair[0]);
       b.onclick=function(){
@@ -1493,6 +1496,42 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     if(!v||v<5||v>3600){appendLog("⚠️ 轮询间隔须在 5~3600 秒之间");toast("轮询间隔须在 5~3600 秒之间","warn");return;}
     return busy(btn,function(){return post("/api/monitor_config",{interval:v});})
       .then(function(j){ if(j){ appendLog("✅ 邻居监控轮询间隔已保存为 "+v+"s"); toast("轮询间隔已保存为 "+v+" 秒","ok"); } });
+  }
+  // 核对：请求一次 adj-rib-out 快照 → 轮询 /api/verify 直到快照刷新 → 展示差异
+  async function verifyNeighbor(ip,btn){
+    await busy(btn,function(){return ctl("show_adj_rib_out",ip);});
+    const started=Date.now();
+    let d=null;
+    for(let i=0;i<25;i++){
+      await new Promise(function(r){setTimeout(r,1000);});
+      try{
+        const r=await fetch(api("/api/verify?ip="+encodeURIComponent(ip)));
+        d=await r.json();
+      }catch(e){ continue; }
+      // 快照时间戳变新（或压根没快照）即认为刷新完成
+      if(d.status==="ok" && (d.snapshot_age!=null && d.snapshot_age*1000 < (Date.now()-started)) ) break;
+    }
+    if(!d || d.status!=="ok"){ toast("核对失败","err"); return; }
+    if(!d.have_snapshot){ toast("还没拿到发布表快照，请稍后再试","warn"); return; }
+    const lines=[
+      "邻居："+ip+"（"+((d.groups||[]).join("、")||"未分组")+"）",
+      "按配置应发 "+d.model+" 条 · 实际发布表 "+d.actual+" 条（快照 "+(d.snapshot_age!=null?d.snapshot_age+"s 前":"—")+"）"
+    ];
+    if(!d.missing && !d.extra){
+      lines.push({text:"✅ 完全一致，没有漂移",warn:false});
+    }else{
+      if(d.missing){
+        lines.push({text:"⚠️ 配置有、实际缺 "+d.missing+" 条：",warn:true});
+        (d.missing_sample||[]).slice(0,8).forEach(function(x){lines.push({text:"  "+x,mono:true});});
+      }
+      if(d.extra){
+        lines.push({text:"⚠️ 实际发、配置里没有 "+d.extra+" 条：",warn:true});
+        (d.extra_sample||[]).slice(0,8).forEach(function(x){lines.push({text:"  "+x,mono:true});});
+      }
+    }
+    await askConfirm({title:"发布表核对",lines:lines,okText:"知道了"});
+    appendLog("🧪 核对 "+ip+"：应发 "+d.model+" / 实际 "+d.actual
+      +(d.missing?(" / 缺 "+d.missing):"")+(d.extra?(" / 多 "+d.extra):""),"control");
   }
   function queryRowPrefix(ip,qi,qr){
     const p=qi.value.trim();

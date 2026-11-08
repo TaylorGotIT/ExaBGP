@@ -1842,6 +1842,38 @@ class AdjRibHandler(BaseHandler):
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
 
+class VerifyHandler(BaseHandler):
+    """发布表核对：模型（按配置应发）对比 adj-rib-out 快照（exabgp 实际认为已发）
+
+    返回 missing（配置有、实际没有）与 extra（实际有、配置里没有），用于发现漂移。
+    """
+    async def get(self):
+        try:
+            ip = self.get_query_argument("ip", "").strip()
+            if not ip:
+                raise ValueError("需要 ip 参数，例如 /api/verify?ip=192.168.75.241")
+            st = NEIGHBOR_STATES.get(ip, {})
+            actual = set(st.get("adj_rib_out", []))
+            model = set()
+            groups = []
+            for g in GROUPS.values():
+                if ip in g.get("neighbors", []):
+                    groups.append(g["name"])
+                    model |= routes_for_group(g["id"])
+            miss = sorted(model - actual)
+            extra = sorted(actual - model)
+            age = int(time.time() - st["rib_ts"]) if st.get("rib_ts") else None
+            self.write({
+                "status": "ok", "ip": ip, "groups": groups,
+                "model": len(model), "actual": len(actual),
+                "missing": len(miss), "extra": len(extra),
+                "missing_sample": miss[:20], "extra_sample": extra[:20],
+                "have_snapshot": bool(actual), "snapshot_age": age,
+            })
+        except Exception as e:
+            self.set_status(500)
+            self.write({"status": "error", "msg": str(e)})
+
 class MetricsHandler(BaseHandler):
     """Prometheus 文本格式指标（只读，供监控系统抓取）"""
 
@@ -1944,6 +1976,7 @@ def make_app():
         (r"/api/monitor_config", MonitorConfigHandler),
         (r"/api/adjrib", AdjRibHandler),
         (r"/api/audit", AuditHandler),
+        (r"/api/verify", VerifyHandler),
         (r"/metrics", MetricsHandler),
         (r"/health", HealthHandler),
         (r"/bulk/announce", BulkAnnounceHandler),
