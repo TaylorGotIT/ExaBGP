@@ -590,7 +590,15 @@ def save_routegroup_prefixes(rgid):
         log(f"❌ 路由组 [{rg['name']}] 前缀持久化失败: {e}")
 
 def parse_prefixes_text(text):
-    return {p for p in re.split(r"[\s,，;；]+", text or "") if p}
+    """把粘贴的前缀文本解析成集合：IPv4/IPv6 均支持，自动补掩码并归一主机位，非法项丢弃"""
+    out = set()
+    for tok in re.split(r"[\s,，;；]+", text or ""):
+        if not tok:
+            continue
+        p = validate_prefix(tok)
+        if p:
+            out.add(p)
+    return out
 
 def valid_ipv4(s):
     """校验是否为合法 IP 地址（IPv4 或 IPv6，用于分组邻居/下一跳/覆盖地址）"""
@@ -1293,10 +1301,13 @@ class RouteGroupsApiHandler(BaseHandler):
                     prefixes = parse_prefixes_text(str(data.get("prefixes", "")))
                 if not prefixes:
                     raise ValueError("路由组为空：请填写前缀列表或提供 URL")
+                rg_nh = str(data.get("next_hop", "")).strip()
+                if rg_nh and not valid_ipv4(rg_nh):
+                    raise ValueError(f"路由组下一跳非法: {rg_nh}（须为合法 IPv4/IPv6 地址）")
                 rgid = "rg" + uuid.uuid4().hex[:6]
                 ROUTE_GROUPS[rgid] = {
                     "id": rgid, "name": name, "prefixes": prefixes,
-                    "next_hop": str(data.get("next_hop", "")).strip(),
+                    "next_hop": rg_nh,
                     "community": str(data.get("community", "")).strip(),
                     "med": normalize_med(data.get("med")),
                     "prepend": normalize_prepend(data.get("prepend")),
@@ -1313,7 +1324,10 @@ class RouteGroupsApiHandler(BaseHandler):
                 if "name" in data and str(data["name"]).strip():
                     rg["name"] = str(data["name"]).strip()
                 if "next_hop" in data:
-                    rg["next_hop"] = str(data["next_hop"]).strip()
+                    v = str(data["next_hop"]).strip()
+                    if v and not valid_ipv4(v):
+                        raise ValueError(f"路由组下一跳非法: {v}（须为合法 IPv4/IPv6 地址）")
+                    rg["next_hop"] = v
                 if "community" in data:
                     rg["community"] = str(data["community"]).strip()
                 if "med" in data:
