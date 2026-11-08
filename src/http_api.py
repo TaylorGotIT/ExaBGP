@@ -1824,20 +1824,52 @@ class AdjRibHandler(BaseHandler):
             st = NEIGHBOR_STATES.get(ip, {})
             rib = st.get("adj_rib_out", [])
             p = validate_prefix(prefix) or prefix
-            found = p in rib
             source = "adj-rib"
             age = int(time.time() - st["rib_ts"]) if st.get("rib_ts") else None
+            pool = set(rib)
             if not rib:
                 # 还没有发布表快照（从未执行过 adj-rib-out，或正在刷新）：按分组配置推算
-                model = set()
+                pool = set()
                 for g in GROUPS.values():
                     if ip in g.get("neighbors", []):
-                        model |= routes_for_group(g["id"])
-                found = p in model
+                        pool |= routes_for_group(g["id"])
                 source = "model"
-            log(f"🔍 {prefix} @ {ip}：{'已发布' if found else '未发布'}（{source}）")
-            self.write({"status": "ok", "ip": ip, "prefix": p, "found": found,
-                        "source": source, "snapshot_age": age, "count": len(rib)})
+
+            exact = p in pool
+            covered_by = []     # 已发布的、包含查询前缀的更大前缀
+            covers = []         # 已发布的、位于查询前缀之内的更小子网
+            try:
+                q = ipaddress.ip_network(p, strict=False)
+            except Exception:
+                q = None
+            if q is not None and not exact:
+                for r in pool:
+                    try:
+                        rn = ipaddress.ip_network(r, strict=False)
+                    except Exception:
+                        continue
+                    if rn.version != q.version or rn == q:
+                        continue
+                    if q.subnet_of(rn):
+                        covered_by.append(r)
+                    elif rn.subnet_of(q):
+                        covers.append(r)
+            if exact:
+                match = "exact"
+            elif covered_by:
+                match = "covered"
+            elif covers:
+                match = "contains"
+            else:
+                match = "none"
+            found = match in ("exact", "covered")
+            covered_by.sort()
+            covers.sort()
+            log(f"🔍 {prefix} @ {ip}：{match}（{source}）")
+            self.write({"status": "ok", "ip": ip, "prefix": p, "found": found, "match": match,
+                        "covered_by": covered_by[:10], "covered_by_count": len(covered_by),
+                        "covers": covers[:10], "covers_count": len(covers),
+                        "source": source, "snapshot_age": age, "count": len(pool)})
         except Exception as e:
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})

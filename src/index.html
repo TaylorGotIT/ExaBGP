@@ -1555,14 +1555,25 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       if(d.status==="error"){appendLog("❌ "+(d.msg||"查询失败"));return;}
       const byModel=(d.source==="model");
       const stale=!byModel && d.snapshot_age!=null && d.snapshot_age>300;
-      const brief=(d.found?"✅ 已发布":"❌ 未发布")+(byModel?" · 按配置":(stale?" · 快照过期":" · 快照"));
-      const color=d.found?((byModel||stale)?"var(--amber)":"var(--green)"):"var(--red)";
+      const mt=d.match||(d.found?"exact":"none");
+      let brief;
+      if(mt==="exact") brief="✅ 已发布";
+      else if(mt==="covered") brief="✅ 已覆盖（含于更大前缀）";
+      else if(mt==="contains") brief="⚠️ 未单独发布（含 "+(d.covers_count||(d.covers||[]).length)+" 条子网）";
+      else brief="❌ 未发布";
+      if(byModel) brief+=" · 按配置"; else if(stale) brief+=" · 快照过期";
+      let color="var(--red)";
+      if(mt==="exact") color=(byModel||stale)?"var(--amber)":"var(--green)";
+      else if(mt==="covered") color="var(--green)";
+      else if(mt==="contains") color="var(--amber)";
       qr.textContent=brief; qr.style.color=color;
-      qr.title=d.prefix+" · "+(d.found?"已发布":"未发布")+"\n"
-        + (byModel
-            ? "按分组配置推算（还没有 adj-rib-out 快照），点「核对」可拉取实际发布表"
-            : "来自 exabgp 实际快照"+(d.snapshot_age!=null?("（"+fmtAge(d.snapshot_age)+"）"):"")
-              +"\n共 "+d.count+" 条"+(stale?"\n快照已超过 5 分钟，建议点「核对」刷新":""));
+      const lines=[d.prefix+" · "+({"exact":"精确发布","covered":"被更大前缀覆盖","contains":"未单独发布，但含已发布子网","none":"未发布"}[mt]||mt)];
+      if(mt==="covered") lines.push("包含它的已发布前缀："+(d.covered_by||[]).join("、")+(d.covered_by_count>10?" 等":""));
+      if(mt==="contains") lines.push("其下的已发布子网："+(d.covers||[]).join("、")+(d.covers_count>10?" 等"+d.covers_count+"条":""));
+      lines.push(byModel?"按分组配置推算（还没有 adj-rib-out 快照），点「核对」可拉实际发布表"
+        :("来自 exabgp 实际快照"+(d.snapshot_age!=null?("（"+fmtAge(d.snapshot_age)+"）"):"")+" · 共 "+d.count+" 条"));
+      if(stale) lines.push("快照已超过 5 分钟，建议点「核对」刷新");
+      qr.title=lines.join("\n");
       PREFIX_RESULT[ip]={prefix:p,text:text,color:color};
       appendLog("🔍 前缀查询: "+d.prefix+" @ "+d.ip+" → "+(d.found?"已发布":"未发布")+(byModel?"（按配置推算）":""),"control");
     }).catch(function(e){appendLog("❌ 查询失败: "+e.message);});
