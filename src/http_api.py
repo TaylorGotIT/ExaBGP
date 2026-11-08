@@ -49,6 +49,50 @@ _LAST_LOG_DATE = ""                                                    # 跨天�
 NEIGHBOR_POLL_INTERVAL = int(os.environ.get("NEIGHBOR_POLL_INTERVAL", "30"))
 NEIGHBOR_NEXT_POLL = 0.0                                               # 距下次轮询的时间戳（首次即轮询）
 
+# ============ 下发台账：每个 peer 上"发过什么"（数据源/路由组/手动） ============
+PEER_LEDGER = {}    # ip -> {"kind:name": {kind, name, count, at}}
+LEDGER_FILE = os.path.join(PERSIST_DIR, "peer_ledger.json")
+
+def save_ledger():
+    try:
+        tmp = LEDGER_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(PEER_LEDGER, f, ensure_ascii=False)
+        os.replace(tmp, LEDGER_FILE)
+    except Exception as e:
+        log(f"⚠️ 下发台账写入失败: {e}")
+
+def load_ledger():
+    try:
+        if os.path.exists(LEDGER_FILE):
+            with open(LEDGER_FILE, "r") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                PEER_LEDGER.update(data)
+    except Exception:
+        pass
+
+def ledger_mark(ips, kind, name, count, remove=False):
+    """登记/更新某批 peer 上的下发来源；remove=True 表示撤回后移除该来源"""
+    key = f"{kind}:{name}"
+    changed = False
+    for ip in ips or []:
+        d = PEER_LEDGER.setdefault(ip, {})
+        if remove:
+            if key in d:
+                del d[key]
+                changed = True
+        else:
+            d[key] = {"kind": kind, "name": name, "count": int(count or 0), "at": time.time()}
+            changed = True
+    if changed:
+        save_ledger()
+
+def ledger_of(ip):
+    items = list((PEER_LEDGER.get(ip) or {}).values())
+    items.sort(key=lambda x: (x.get("kind", ""), x.get("name", "")))
+    return items
+
 # ============ SSE 实时日志广播中心 ============
 LOG_HISTORY = deque(maxlen=500)   # 历史日志环形缓冲（新客户端接入先补发；元素: {t, tag, text}）
 SSE_CLIENTS = set()               # 活跃 SSE 客户端队列集合
@@ -864,6 +908,8 @@ async def source_refresh_job(sid):
             await write_withdraws(dele, only_id=gid)
         if add:
             await write_announces(add, only_id=gid)
+        if add or dele:
+            ledger_mark(g["neighbors"], "source", s["name"], len(s["routes"]))
         total_add += len(add)
         total_del += len(dele)
         if add or dele:
@@ -981,6 +1027,14 @@ async def announce_union_to_groups(only_id=None):
             continue
         total += len(prefixes)
         await write_announces(prefixes, only_id=g["id"])
+        # 台账：开机回填时按可见源登记，重启后不会丢"发过什么"
+        for src in SOURCES.values():
+            if not src["enabled"]:
+                continue
+            bound = src.get("groups") or []
+            if bound and g["id"] not in bound:
+                continue
+            ledger_mark(g["neighbors"], "source", src["name"], len(src["routes"]))
     if only_id is None and total:
         log(f"⚡ 开机回填 {total} 条")
 
@@ -1003,6 +1057,13 @@ async def announce_union_to_group(gid):
         return
     prefixes = routes_for_group(gid)
     await write_announces(prefixes, only_id=gid)
+    for src in SOURCES.values():
+        if not src["enabled"]:
+            continue
+        bound = src.get("groups") or []
+        if bound and gid not in bound:
+            continue
+        ledger_mark(g["neighbors"], "source", src["name"], len(src["routes"]))
     if prefixes:
         log(f"📢 [{g['name']}] 补发 {len(prefixes)} 条")
     sse_broadcast_status()
@@ -1535,6 +1596,17 @@ class BulkAnnounceHandler(BaseHandler):
                             "commands_total": len(cmds), "commands": cmds[:50], "detail": detail})
                 return
             await asyncio.to_thread(write_to_pipe, cmds)
+            # 台账：记录每个 peer 上本次发布了哪些来源
+            targets = resolve_targets(data)
+            for rgid in data.get("route_groups") or []:
+                rg = ROUTE_GROUPS.get(rgid)
+                if not rg:
+                    continue
+                for g in targets:
+                    ledger_mark(g["neighbors"], "routegroup", rg["name"], len(rg["prefixes"]))
+            if data.get("routes"):
+                for g in targets:
+                    ledger_mark(g["neighbors"], "manual", "手动发布", len(items))
             sse_broadcast_status()
             self.write({"status": "ok", "count": len(items), "groups": len(detail), "detail": detail})
         except Exception as e:
@@ -1578,6 +1650,12 @@ class BulkWithdrawHandler(BaseHandler):
                             "commands": (cmds[:25] + restore_cmds[:25]), "detail": detail})
                 return
             await asyncio.to_thread(write_to_pipe, cmds)
+            for rgid in data.get("route_groups") or []:
+                rg = ROUTE_GROUPS.get(rgid)
+                if not rg:
+                    continue
+                for g in resolve_targets(data):
+                    ledger_mark(g["neighbors"], "routegroup", rg["name"], 0, remove=True)
             if restored:
                 log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，按分组属性回发", "bulk")
             if restore_cmds:
@@ -1695,6 +1773,7 @@ class NeighborsHandler(BaseHandler):
                 "rib_count": rib,
                 "rib_count_src": src,
                 "adj_rib_out": adj,
+                "ledger": ledger_of(ip),
                 "updated": st.get("updated", 0),
                 "age": int(now - st.get("updated", now)),
             }
@@ -1856,6 +1935,7 @@ async def run_server():
     app.listen(9550, address="0.0.0.0")
     print("✅ ExaBGP HTTP API (Multi-Source / Multi-Group / Route-Groups / SSE) started on port 9550", file=sys.stderr)
 
+    load_ledger()
     loaded = load_config()
     if not loaded or not SOURCES or not GROUPS:
         bootstrap_defaults()

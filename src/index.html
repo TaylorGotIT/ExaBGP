@@ -112,6 +112,7 @@
   tr.nbrow td{border-bottom:0}
   tr.detail td{background:rgba(0,0,0,.16);padding:6px 10px 8px!important;height:auto!important}
   tr.detail:hover td{background:rgba(0,0,0,.16)!important}
+  .nb-ledger{font-size:12px;color:var(--muted);margin:2px 0 6px;font-family:Consolas,'Courier New',monospace}
   .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
   .nbq input{width:170px;flex:0 0 auto;height:26px;font-size:12px;font-family:Consolas,'Courier New',monospace}
   .nbq .nbq-res{font-size:12px;font-family:Consolas,'Courier New',monospace;white-space:nowrap}
@@ -1377,6 +1378,18 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     // 详情行：命令回显
     const dr=el("tr","detail");
     const dd=el("td"); dd.colSpan=5;
+    const led=el("div","nb-ledger");
+    const items=(st.ledger||[]);
+    if(items.length){
+      led.textContent="已下发来源："+items.map(function(x){return x.name+"（"+x.count+" 条）";}).join(" · ");
+      led.title=items.map(function(x){
+        return x.name+" · "+x.count+" 条 · "+new Date((x.at||0)*1000).toLocaleString("zh-CN",{hour12:false});
+      }).join("\n");
+    }else{
+      led.textContent="已下发来源：—（暂无台账记录，重启后自动补记）";
+    }
+    dd.appendChild(led);
+
     const resp=el("div","nbresp"); resp.dataset.ip=ip;
     const rh=el("div","nbresp-head"); rh.textContent="▶ 回显加载中…";
     const rl=el("div","nbresp-list");
