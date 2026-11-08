@@ -267,8 +267,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     <button id="btnTheme" class="sm" title="切换深色/浅色主题">☀</button>
     <button id="btnConf" class="sm" title="查看 exabgp.conf 与配置漂移">配置</button>
     <button id="btnAudit" class="sm" title="查看操作审计">审计</button>
-    <button id="btnToken" class="sm" title="设置访问令牌">🔑</button>
-    <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
+        <span class="badge"><span class="dot" id="sseDot"></span><span id="sseTxt">SSE 未连接</span></span>
   </header>
 
   <div id="alertBar" class="alert-bar"></div>
@@ -499,20 +498,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     </div>
   </div>
 
-  <div id="tokenModal" class="modal hidden">
-    <div class="modal-box sm">
-      <div class="modal-head"><span class="t">访问令牌</span></div>
-      <div class="cfm-body">
-        <div>服务端启用了访问令牌，请输入后继续（仅保存在本浏览器 localStorage）。</div>
-        <div class="mini-label" style="margin-top:8px">只读令牌可以查看但不能修改。</div>
-      </div>
-      <div style="margin-top:12px"><input id="tokenInput" placeholder="粘贴 token" autocomplete="off"></div>
-      <div class="cfm-actions">
-        <button id="tokenClear">清除</button>
-        <button id="tokenSave" class="primary">保存并重试</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div id="toasts"></div>
@@ -530,32 +515,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   let LAST_STATUS=null, LAST_NEIGHBORS=null, SSE_OK=false;
   let CACHED_COUNT=0;
 
-  // ---------- 访问令牌（服务端配置 API_TOKEN 时才需要） ----------
-  const TOKEN_KEY = "exabgp_token";
-  let TOKEN = localStorage.getItem(TOKEN_KEY) || "";
-  let tokenPrompted = false;
-  function api(u){
-    if(!TOKEN) return u;
-    return u + (u.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(TOKEN);
-  }
-  function needToken(){
-    if(tokenPrompted) return;
-    tokenPrompted = true;
-    $("tokenModal").classList.remove("hidden");
-    $("tokenInput").value = TOKEN;
-    setTimeout(function(){ $("tokenInput").focus(); }, 50);
-  }
-  // 统一拦截 401/403：弹令牌框 / 只读提示
-  (function(){
-    const _f = window.fetch.bind(window);
-    window.fetch = function(u, o){
-      return _f(u, o).then(function(r){
-        if(r.status === 401){ needToken(); }
-        else if(r.status === 403){ toast("只读令牌：不允许执行写操作", "err"); }
-        return r;
-      });
-    };
-  })();
+  // 接口地址（同源）
+  function api(u){ return u; }
 
   function toast(msg, type){
     const box=$("toasts"); if(!box)return;
@@ -1708,7 +1669,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   async function loadConf(){
     try{
       const r=await fetch(api("/api/conf?diff=1"));
-      if(r.status===401){ needToken(); return; }
       const d=await r.json();
       const pre=$("confPre"); pre.innerHTML="";
       const st=$("confState");
@@ -1748,7 +1708,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const q = $("auditFilter").value.trim();
     try{
       const r = await fetch(api("/api/audit?limit=200" + (q ? "&q=" + encodeURIComponent(q) : "")));
-      if(r.status === 401){ needToken(); return; }
       const d = await r.json();
       const items = d.items || [];
       AUDIT_ITEMS = items;
@@ -1844,19 +1803,6 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   };
   let auditTimer=null;
   $("auditFilter").addEventListener("input",function(){ clearTimeout(auditTimer); auditTimer=setTimeout(loadAudit,300); });
-  $("btnToken").onclick=function(){ $("tokenModal").classList.remove("hidden"); $("tokenInput").value=TOKEN; $("tokenInput").focus(); };
-  $("tokenSave").onclick=function(){
-    TOKEN=$("tokenInput").value.trim();
-    if(TOKEN) localStorage.setItem(TOKEN_KEY,TOKEN); else localStorage.removeItem(TOKEN_KEY);
-    $("tokenModal").classList.add("hidden");
-    tokenPrompted=false;
-    initSSE(); loadStatus();
-    toast("令牌已保存，正在重新加载","ok");
-  };
-  $("tokenClear").onclick=function(){
-    TOKEN=""; localStorage.removeItem(TOKEN_KEY); $("tokenInput").value="";
-    toast("已清除本地令牌","ok");
-  };
 
   // 表头排序
   bindSortHeaders();

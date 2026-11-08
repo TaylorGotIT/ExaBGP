@@ -107,8 +107,6 @@ docker rename exabgp-v6-prev exabgp-v6 && docker start exabgp-v6
 | `LOG_DIR` | `/exabgp/data/logs` | 按天日志目录 |
 | `LOG_MAX_BYTES` | `5242880` | 单日日志上限（5MB） |
 | `LOG_RETENTION_DAYS` | `7` | 日志留存天数 |
-| `API_TOKEN` | 空 | 设置后启用鉴权：写操作需 `Authorization: Bearer <token>` 或 `?token=`；**留空则不鉴权**（默认） |
-| `VIEWER_TOKEN` | 空 | 只读令牌：可查看全部 GET 接口，任何写操作返回 403 |
 | `ALERT_WEBHOOK` | 空 | 告警 webhook 地址（钉钉/企微机器人或 Slack Incoming Webhook）；留空不告警 |
 | `ALERT_KIND` | `dingtalk` | webhook 类型：`dingtalk` / `wecom` / `slack` |
 | `ALERT_INTERVAL` | `300` | 同一告警 key 的去重窗口（秒），避免告警风暴 |

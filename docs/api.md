@@ -56,16 +56,16 @@ exabgp_last_refresh_timestamp 1794071485
 
 ## 鉴权（可选）
 
-服务端设置 `API_TOKEN` 后，除 `/`、`/index.html`、`/health` 外的接口都需要令牌：
+本版**不内置鉴权**：所有接口直连可用，请通过网络隔离或前置反向代理保护端口。历史上曾有 `API_TOKEN` / `VIEWER_TOKEN` 机制，已移除。
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:9550/api/status
 curl "http://127.0.0.1:9550/api/logs?token=$TOKEN"      # SSE 用查询参数
 ```
 
-- 未提供 / 不匹配 → `401 {"status":"error","msg":"需要访问令牌…"}`
-- `VIEWER_TOKEN` 命中的令牌只读：`POST` 返回 `403`
-- 未设置 `API_TOKEN` 时不鉴权（默认，兼容旧部署）
+
+
+
 
 ## 操作审计
 

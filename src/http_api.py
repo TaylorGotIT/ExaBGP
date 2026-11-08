@@ -181,9 +181,6 @@ def calibrate_ips_group():
             log(f"🛡️ {g['name']} 校准为 {IPS_NEXT_HOP} / {IPS_COMMUNITY}")
 
 
-# ============ 访问令牌 / 角色（未配置 API_TOKEN 时不启用鉴权） ============
-API_TOKEN = os.environ.get("API_TOKEN", "").strip()
-VIEWER_TOKEN = os.environ.get("VIEWER_TOKEN", "").strip()
 
 # ============ 操作审计（JSONL，按天滚动） ============
 AUDIT_DIR = os.path.join(PERSIST_DIR, "audit")
@@ -1086,41 +1083,10 @@ async def withdraw_all_from_group(gid):
 
 # ============ HTTP 接口 ============
 class BaseHandler(tornado.web.RequestHandler):
-    """统一鉴权 + 写操作审计。
-
-    - 未配置 API_TOKEN 时保持开放（与旧版本行为一致）
-    - 配置后：Authorization: Bearer <token> 或 ?token=<token>
-      VIEWER_TOKEN 匹配时为只读角色，所有写操作返回 403
-    """
+    """写操作审计（本版不内置鉴权，请用反向代理或网络隔离保护端口）"""
 
     def prepare(self):
-        self.role = "operator"
-        if self.request.path in ("/", "/index.html", "/health", "/metrics"):
-            return          # 页面本身与健康检查不要求令牌
-        if not API_TOKEN:
-            return
-        token = self._request_token()
-        if token and token == API_TOKEN:
-            self.role = "operator"
-        elif token and VIEWER_TOKEN and token == VIEWER_TOKEN:
-            self.role = "viewer"
-        else:
-            self.set_status(401)
-            self.set_header("Content-Type", "application/json; charset=UTF-8")
-            self.finish(json.dumps({"status": "error",
-                                    "msg": "需要访问令牌：Authorization: Bearer <token> 或 ?token=<token>"},
-                                   ensure_ascii=False))
-            return
-        if self.role == "viewer" and self.request.method not in ("GET", "HEAD"):
-            self.set_status(403)
-            self.set_header("Content-Type", "application/json; charset=UTF-8")
-            self.finish(json.dumps({"status": "error", "msg": "只读令牌不允许执行写操作"}, ensure_ascii=False))
-
-    def _request_token(self):
-        h = self.request.headers.get("Authorization", "")
-        if h.lower().startswith("bearer "):
-            return h[7:].strip()
-        return self.get_argument("token", "").strip()
+        pass
 
     def on_finish(self):
         """写操作留痕：路径 + action + 目标 + 关键参数 + 结果"""

@@ -80,7 +80,6 @@ DATA_URL=https://gaoyifan.github.io/china-operator-ip/china.txt
 REFRESH_INTERVAL=3600
 
 # 控制台端口（固定 9550）
-# API_TOKEN=            # 需要鉴权时填写
 # ALERT_WEBHOOK=        # 告警 webhook
 EOF
   chmod 0640 "$CONF_DIR/env"
