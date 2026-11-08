@@ -1433,7 +1433,10 @@ def expand_announce_items(data):
             items.append({"route": p, "next_hop": nh, "community": cm, "med": med, "prepend": prep})
     for it in data.get("routes") or []:
         if isinstance(it, str):
-            items.append({"route": it, "next_hop": None, "community": None})
+            p = validate_prefix(it)
+            if not p:
+                raise ValueError(f"前缀非法：{it}")
+            items.append({"route": p, "next_hop": None, "community": None})
         else:
             items.append(it)
     return items
