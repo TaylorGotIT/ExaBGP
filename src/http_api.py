@@ -705,9 +705,18 @@ def write_to_pipe(commands):
             else:
                 for st in NEIGHBOR_STATES.values():
                     st["adj_rib_out"] = []
-    with open(EXABGP_IN, "w") as f:
-        for cmd in commands:
-            f.write(cmd)
+    text = "".join(commands)
+    # exabgp 在配置热重载瞬间可能短暂关闭管道，写失败重试几次再放弃
+    for attempt in range(3):
+        try:
+            with open(EXABGP_IN, "w") as f:
+                f.write(text)
+            break
+        except BrokenPipeError:
+            if attempt == 2:
+                log("⚠️ exabgp 管道写入失败（对端已关闭），本次下发可能不完整")
+                raise
+            time.sleep(0.4)
     if DEMO_MODE:
         demo_simulate_responses(commands)
 
