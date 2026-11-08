@@ -1140,6 +1140,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
 
   // ---------- 下发记录回显 ----------
   function showBulk(j, act){
+    if(typeof loadNeighbors==="function") setTimeout(loadNeighbors, 300);   // 台账立即刷新
     const verb = act==="announce" ? "发布" : "撤回";
     if(j.status==="error"){ appendLog("❌ "+verb+"失败："+(j.msg||"未知错误"), "bulk"); return; }
     const t=new Date().toLocaleTimeString();
@@ -1298,6 +1299,27 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   }
 
   // ---------- 邻居监控 & 运行时控制 ----------
+  function paintLedger(el, items){
+    if(items.length){
+      el.textContent="已下发来源："+items.map(function(x){return x.name+"（"+x.count+" 条）";}).join(" · ");
+      el.title=items.map(function(x){
+        return x.name+" · "+x.count+" 条 · "+new Date((x.at||0)*1000).toLocaleString("zh-CN",{hour12:false});
+      }).join("\n");
+    }else{
+      el.textContent="已下发来源：—（暂无台账记录）";
+    }
+  }
+  // 正在输入时也要刷新台账（只改文本，不动 DOM 结构，避免打断输入）
+  function updateLedgerLines(d){
+    const all=(d&&d.neighbors)||{};
+    document.querySelectorAll("#nbBody tr.nbrow").forEach(function(tr){
+      const ip=tr.dataset.ip;
+      const next=tr.nextElementSibling;
+      if(!next)return;
+      const led=next.querySelector(".nb-ledger");
+      if(led) paintLedger(led, ((all[ip]||{}).ledger)||[]);
+    });
+  }
   function renderNeighbors(d){
     const body=$("nbBody"); body.innerHTML="";
     const all=d.neighbors||{};
@@ -1379,15 +1401,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const dr=el("tr","detail");
     const dd=el("td"); dd.colSpan=5;
     const led=el("div","nb-ledger");
-    const items=(st.ledger||[]);
-    if(items.length){
-      led.textContent="已下发来源："+items.map(function(x){return x.name+"（"+x.count+" 条）";}).join(" · ");
-      led.title=items.map(function(x){
-        return x.name+" · "+x.count+" 条 · "+new Date((x.at||0)*1000).toLocaleString("zh-CN",{hour12:false});
-      }).join("\n");
-    }else{
-      led.textContent="已下发来源：—（暂无台账记录，重启后自动补记）";
-    }
+    paintLedger(led, st.ledger||[]);
     dd.appendChild(led);
 
     const resp=el("div","nbresp"); resp.dataset.ip=ip;
@@ -1425,7 +1439,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       if(d.status==="error")return;
       LAST_NEIGHBORS=d;
       updateAlerts();
-      if(nbEditing()){renderNeighborResp();return;}
+      if(nbEditing()){ updateLedgerLines(d); renderNeighborResp(); return; }
       renderNeighbors(d);
     }).catch(function(){});
   }
