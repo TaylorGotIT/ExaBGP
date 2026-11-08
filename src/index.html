@@ -1384,8 +1384,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     }
     if(st.msg_sent||st.msg_recvd){
       const line2=el("div","nb-sub");
-      const mc=el("span",null,"KA "+st.msg_sent+"   UP "+st.msg_recvd);
-      mc.title="该会话的 BGP 报文计数：KA = sent（我们发出的报文数），UP = recvd（从对端收到的报文数）；"
+      const mc=el("span",null,"ST "+st.msg_sent+"   RC "+st.msg_recvd);
+      mc.title="该 BGP 会话的报文计数：ST(sent) = 我们发出的报文数，RC(recvd) = 从对端收到的报文数；"
         +"报文含 KEEPALIVE/UPDATE/NOTIFICATION，不等于路由条数——路由看『已发布路由』列";
       line2.appendChild(mc);
       cs.appendChild(line2);
