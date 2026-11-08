@@ -230,6 +230,35 @@ bgp 65001
 - 在 **IPv4 会话上承载 IPv6 路由** 需要对端支持 Extended Next Hop（RFC 5549）；华为侧对应 `peer <ip> capability-advertise add-path`/`extended-next-hop` 相关配置，不支持时这些 v6 路由不会被接收
 - IPS 黑洞同样适用：v6 名单里的裸地址会自动补 `/128`
 
+### 8.1 CE（华为）侧参考配置（已实测通过）
+
+```
+interface Vlanif75
+ ipv6 enable                                   # 必须先启用，否则配地址报 "IPv6 has not been enabled"
+ ipv6 address fd08:93db:7bf9::1/64
+
+bgp 65001
+ router-id 192.168.75.241
+ peer 192.168.75.244 as-number 65000
+ peer 192.168.75.244 connect-interface Vlanif75
+ #
+ ipv4-family unicast
+  peer 192.168.75.244 enable
+ #
+ ipv6-family unicast
+  peer 192.168.75.244 enable
+```
+
+验证：
+
+```
+display bgp all summary
+ Address Family:Ipv4 Unicast  → RtRcv 7923
+ Address Family:Ipv6 Unicast  → RtRcv 3435   ← 同一个 v4 会话承载（MP-BGP）
+```
+
+> **注意下一跳**：v6 路由的下一跳必须在 CE 侧可达。若填注入机自己的 v6 地址，CE 会把该网段流量送到注入机（等于黑洞）；生产环境请填真实的 v6 出口网关。
+
 ## 9. 注意事项
 
 1. **改属性要重播**：分组属性保存后引擎会自动对该组重播全库；路由组属性只在"发布选中路由组"时生效。
