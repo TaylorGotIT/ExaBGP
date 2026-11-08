@@ -229,6 +229,7 @@ bgp 65001
 - **IPv6 邻居**：必须同时把分组『本地地址』配成 IPv6（exabgp 要求每个邻居都有 local-address，族不一致会报 `incomplete neighbor`）；可以先填 `::` 由内核选源。`router-id` 必须是 IPv4，否则自动省略
 - 在 **IPv4 会话上承载 IPv6 路由** 需要对端支持 Extended Next Hop（RFC 5549）；华为侧对应 `peer <ip> capability-advertise add-path`/`extended-next-hop` 相关配置，不支持时这些 v6 路由不会被接收
 - IPS 黑洞同样适用：v6 名单里的裸地址会自动补 `/128`
+- **务必给数据源显式绑定分组**：未绑定的源会发往**所有**启用分组。曾出现 v4 源未绑定 → 流进 IPv6 分组 → 同一批 v4 前缀被用 IPv6 下一跳重发，CE 收到后因下一跳族不符而装不进 IPv4 路由表。正确做法：v4 源绑 v4 组，v6 源绑 v6 组。
 
 ### 8.1 CE（华为）侧参考配置（已实测通过）
 
