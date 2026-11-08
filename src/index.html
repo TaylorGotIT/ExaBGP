@@ -118,6 +118,7 @@
   .nb-sub{color:var(--muted);font-size:11px;margin-top:2px;font-family:Consolas,'Courier New',monospace;white-space:nowrap}
   .nb-sub .sep-dot{margin:0 5px;opacity:.6}
   .nbresp-head.clamp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tip-pop{position:fixed;z-index:9999;max-width:460px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.45);white-space:pre-wrap;font-family:Consolas,'Courier New',monospace;pointer-events:none;display:none}
   .nb-ledger{font-size:12px;color:var(--muted);margin:2px 0 6px;font-family:Consolas,'Courier New',monospace}
   .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
   .nbq input{width:170px;flex:0 0 auto;height:26px;font-size:12px;font-family:Consolas,'Courier New',monospace}
@@ -1309,12 +1310,34 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   }
 
   // ---------- 邻居监控 & 运行时控制 ----------
+  let TIP=null, TIP_ANCHOR=null;
+  function tipShow(anchor, text){
+    if(!text) return;
+    if(!TIP){ TIP=el("div","tip-pop"); document.body.appendChild(TIP); }
+    TIP.textContent=text; TIP.style.display="block";
+    const r=anchor.getBoundingClientRect();
+    const tw=TIP.offsetWidth, th=TIP.offsetHeight;
+    let left=Math.max(8, Math.min(r.left, window.innerWidth-tw-12));
+    let top=r.top-th-8;
+    if(top<8) top=Math.min(r.bottom+8, window.innerHeight-th-8);
+    TIP.style.left=left+"px"; TIP.style.top=Math.max(8,top)+"px";
+    TIP_ANCHOR=anchor;
+  }
+  function tipHide(){ if(TIP){ TIP.style.display="none"; TIP_ANCHOR=null; } }
+  window.addEventListener("scroll", tipHide, true);
+  window.addEventListener("resize", tipHide);
+  function attachTip(node, getText){
+    node.addEventListener("mouseenter", function(){ tipShow(node, getText()); });
+    node.addEventListener("mouseleave", tipHide);
+    node.addEventListener("click", function(e){ e.stopPropagation(); tipShow(node, getText()); });
+  }
   function paintLedger(el, items){
     if(items.length){
       el.textContent="已下发来源："+items.map(function(x){return x.name+"（"+x.count+" 条）";}).join(" · ");
-      el.title=items.map(function(x){
-        return x.name+" · "+x.count+" 条 · "+new Date((x.at||0)*1000).toLocaleString("zh-CN",{hour12:false});
+      el.dataset.tip="已下发来源（登记时间）：\n"+items.map(function(x){
+        return "· "+x.name+" — "+x.count+" 条 — "+new Date((x.at||0)*1000).toLocaleString("zh-CN",{hour12:false});
       }).join("\n");
+      el.title="";
     }else{
       el.textContent="已下发来源：—（暂无台账记录）";
     }
@@ -1407,7 +1430,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     qi.value=PREFIX_INPUT[ip]!=null?PREFIX_INPUT[ip]:((PREFIX_RESULT[ip]||{}).prefix||"");
     qi.oninput=function(){PREFIX_INPUT[ip]=qi.value;};
     const qb=el("button","sm","查询"); qb.title="查询该前缀是否已发布";
-    const qr=el("span","nbq-res");
+    const qr=el("span","nbq-res"); attachTip(qr, function(){ return qr.dataset.tip||""; });
     if(PREFIX_RESULT[ip]){qr.textContent=PREFIX_RESULT[ip].text;qr.style.color=PREFIX_RESULT[ip].color;}
     qb.onclick=function(){queryRowPrefix(ip,qi,qr);};
     qi.onkeydown=function(e){if(e.key==="Enter")queryRowPrefix(ip,qi,qr);};
@@ -1431,7 +1454,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const dr=el("tr","detail");
     const dd=el("td"); dd.colSpan=5;
     const led=el("div","nb-ledger");
-    paintLedger(led, st.ledger||[]);
+    paintLedger(led, st.ledger||[]); attachTip(led, function(){ return led.dataset.tip||""; });
     dd.appendChild(led);
 
     const resp=el("div","nbresp"); resp.dataset.ip=ip;
@@ -1573,7 +1596,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       lines.push(byModel?"按分组配置推算（还没有 adj-rib-out 快照），点「核对」可拉实际发布表"
         :("来自 exabgp 实际快照"+(d.snapshot_age!=null?("（"+fmtAge(d.snapshot_age)+"）"):"")+" · 共 "+d.count+" 条"));
       if(stale) lines.push("快照已超过 5 分钟，建议点「核对」刷新");
-      qr.title=lines.join("\n");
+      qr.dataset.tip=lines.join("\n"); qr.title="";
       PREFIX_RESULT[ip]={prefix:p,text:text,color:color};
       appendLog("🔍 前缀查询: "+d.prefix+" @ "+d.ip+" → "+(d.found?"已发布":"未发布")+(byModel?"（按配置推算）":""),"control");
     }).catch(function(e){appendLog("❌ 查询失败: "+e.message);});
