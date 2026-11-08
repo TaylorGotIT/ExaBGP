@@ -309,12 +309,16 @@ def handle_output_line(line):
         return
     RESPONSES.append({"t": time.time(), "line": line})
     # exabgp 4.x `show neighbor summary` 输出行：Peer  IP  AS  up/down  state  #sent  #recvd
-    m = re.match(r"^(\d+\.\d+\.\d+\.\d+)\s+\S+\s+\S+\s+([A-Za-z]+)\s+\d+\s+\d+\s*$", line)
+    m = re.match(r"^(\d+\.\d+\.\d+\.\d+)\s+(\S+)\s+(\S+)\s+([A-Za-z]+)\s+(\d+)\s+(\d+)\s*$", line)
     if m:
-        ip, st = m.group(1), FSM_MAP.get(m.group(2).lower(), m.group(2))
+        ip, st = m.group(1), FSM_MAP.get(m.group(4).lower(), m.group(4))
         old = NEIGHBOR_STATES.get(ip, {}).get("state")
         st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
         st0["state"] = st
+        st0["peer_as"] = m.group(2)
+        st0["updown"] = m.group(3)          # 形如 0:03:38 或 never
+        st0["msg_sent"] = int(m.group(5))
+        st0["msg_recvd"] = int(m.group(6))
         st0["updated"] = time.time()
         if old and old != st:
             on_neighbor_change(ip, old, st)
@@ -1773,6 +1777,10 @@ class NeighborsHandler(BaseHandler):
                 "rib_count": rib,
                 "rib_count_src": src,
                 "adj_rib_out": adj,
+                "peer_as": st.get("peer_as", ""),
+                "updown": st.get("updown", ""),
+                "msg_sent": st.get("msg_sent", 0),
+                "msg_recvd": st.get("msg_recvd", 0),
                 "ledger": ledger_of(ip),
                 "updated": st.get("updated", 0),
                 "age": int(now - st.get("updated", now)),

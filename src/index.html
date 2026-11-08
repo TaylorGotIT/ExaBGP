@@ -112,6 +112,10 @@
   tr.nbrow td{border-bottom:0}
   tr.detail td{background:rgba(0,0,0,.16);padding:6px 10px 8px!important;height:auto!important}
   tr.detail:hover td{background:rgba(0,0,0,.16)!important}
+  .grp-row{cursor:pointer;user-select:none}
+  .grp-row .fold{color:var(--muted);margin-right:6px;font-size:11px}
+  .nb-up{color:var(--muted);font-size:11.5px;margin-left:6px}
+  .nbresp-head.clamp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .nb-ledger{font-size:12px;color:var(--muted);margin:2px 0 6px;font-family:Consolas,'Courier New',monospace}
   .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
   .nbq input{width:170px;flex:0 0 auto;height:26px;font-size:12px;font-family:Consolas,'Courier New',monospace}
@@ -282,6 +286,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       <input id="monitorInterval" type="number" min="5" max="3600" value="30" style="width:88px">
       <span class="hint">秒</span>
       <button id="btnSaveMonitor" class="sm">保存</button>
+      <label class="inline" style="margin-left:10px"><input type="checkbox" id="nbOnlyAbn" class="chk"> 只看异常</label>
     </div>
     <div class="panel-body flush">
       <div class="tbl-wrap">
@@ -1242,6 +1247,9 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     return {wrap:wrap, value:function(){ return val.value; }};
   }
 
+  const GROUP_FOLD = (function(){ try{ return JSON.parse(localStorage.getItem("exabgp_group_fold")||"{}"); }catch(e){ return {}; } })();
+  function saveFold(){ try{ localStorage.setItem("exabgp_group_fold", JSON.stringify(GROUP_FOLD)); }catch(e){} }
+  let ONLY_ABNORMAL=false;
   let GROUPS_SIG = "";
   function groupMenuOpen(){
     const ms=document.querySelectorAll(".gsel-menu");
@@ -1329,12 +1337,16 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const gips=(g.neighbors||[]).slice();
       if(!gips.length)return;
       gips.forEach(function(ip){used[ip]=1;});
+      const collapsed=!!GROUP_FOLD[g.id];
       const h=el("tr","grp-row");
       const td=el("td"); td.colSpan=5;
+      td.appendChild(el("span","fold",collapsed?"▶":"▼"));
       td.appendChild(el("span","grp-name",(g.enabled?"👥 ":"⛔ ")+g.name));
       td.appendChild(el("span","grp-meta",g.neighbors.join(", ")+" · "+gips.length+" 个邻居"));
       h.appendChild(td); body.appendChild(h);
-      gips.forEach(function(ip){renderNeighborRow(body,ip,all[ip]);});
+      h.onclick=function(){ GROUP_FOLD[g.id]=!GROUP_FOLD[g.id]; saveFold(); renderNeighbors(LAST_NEIGHBORS||d); };
+      const showIps=ONLY_ABNORMAL?gips.filter(function(ip){ const s0=(all[ip]||{}).state||"unknown"; return s0!=="Established"; }):gips;
+      if(!collapsed) showIps.forEach(function(ip){renderNeighborRow(body,ip,all[ip]);});
       rendered+=gips.length;
     });
     const un=Object.keys(all).filter(function(ip){return !used[ip];});
@@ -1360,7 +1372,14 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const cs=cell(null);
     const se=el("span","st "+(state==="Established"?"est":(state==="unknown"?"unknown":"bad")),
       state+(state==="unknown"?"（未响应）":""));
-    cs.appendChild(se); r.appendChild(cs);
+    cs.appendChild(se);
+    const ud=st.updown&&st.updown!=="never"?st.updown:"";
+    if(ud){ const u=el("span","nb-up","↑"+ud); u.title="已建立时长（show neighbor summary）"; cs.appendChild(u); }
+    if(st.msg_sent||st.msg_recvd){
+      const mc=el("span","nb-up","↑"+st.msg_sent+" ↓"+st.msg_recvd);
+      mc.title="收发消息计数（sent / recvd）"; cs.appendChild(mc);
+    }
+    r.appendChild(cs);
     const rc=Number(st.rib_count||0);
     const ribCell=cell("num", rc>0 ? (rc+" 条") : "—");
     if(st.rib_count_src==="model"){
@@ -1405,7 +1424,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     dd.appendChild(led);
 
     const resp=el("div","nbresp"); resp.dataset.ip=ip;
-    const rh=el("div","nbresp-head"); rh.textContent="▶ 回显加载中…";
+    const rh=el("div","nbresp-head clamp"); rh.textContent="▶ 回显加载中…";
     const rl=el("div","nbresp-list");
     rh.onclick=function(){RESP_EXPANDED[ip]=!RESP_EXPANDED[ip];renderNeighborResp();};
     resp.appendChild(rh); resp.appendChild(rl);
@@ -1428,6 +1447,8 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
         return;
       }
       rh.textContent=(open?"▼ ":"▶ ")+"最新: ["+tsOf(lines[0])+"] "+lines[0].line;
+      rh.className="nbresp-head"+(open?"":" clamp");
+      rh.title=open?"点击收起":"点击展开完整回显";
       rl.innerHTML="";
       lines.slice(0,10).forEach(function(x){
         rl.appendChild(el("div",null,"["+tsOf(x)+"] "+x.line));
@@ -1653,6 +1674,10 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   $("btnAddRg").onclick=function(){busy(this,addRouteGroup);};
   $("btnClear").onclick=clearLog;
   $("btnSaveMonitor").onclick=function(){ saveMonitorInterval(this); };
+  $("nbOnlyAbn").onchange=function(){
+    ONLY_ABNORMAL=this.checked;
+    renderNeighbors(LAST_NEIGHBORS||{neighbors:{},monitored:[]});
+  };
   $("rgModalClose").onclick=closeRgModal;
   $("rgAddPrefixBtn").onclick=function(){addPrefix(this);};
   $("rgAddPrefix").addEventListener("keydown",function(e){if(e.key==="Enter")addPrefix($("rgAddPrefixBtn"));});
