@@ -58,6 +58,7 @@ TAG_RULES = (
     (("首次运行",), "system"),
     (("⌨️",), "control"),
     (("👁️", "🔔 邻居"), "neighbor"),
+    (("♻️",), "bulk"),          # 撤回时按分组属性回发的命令，归到「下发记录」
     (("📢",), "announce"),
     (("数据源", "[源:", "快照", "迁移"), "source"),
     (("撤回",), "withdraw"),
@@ -87,9 +88,10 @@ def sse_broadcast(payload):
 def sse_broadcast_status():
     sse_broadcast(status_payload())
 
-def log(msg):
+def log(msg, tag=None):
+    """写一条运行日志；tag 显式指定类别（否则按消息特征推断）"""
     text = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
-    item = {"t": time.time(), "tag": infer_tag(msg), "text": text, "msg": msg}
+    item = {"t": time.time(), "tag": tag or infer_tag(msg), "text": text, "msg": msg}
     print(text, file=sys.stderr)
     LOG_HISTORY.append(item)
     _write_disk_log(item)
@@ -1577,16 +1579,16 @@ class BulkWithdrawHandler(BaseHandler):
                 return
             await asyncio.to_thread(write_to_pipe, cmds)
             if restored:
-                log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，按分组属性回发")
+                log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，按分组属性回发", "bulk")
             if restore_cmds:
                 await asyncio.to_thread(write_to_pipe, restore_cmds)
                 # 把回发的具体命令也打出来，便于核对"到底发了什么属性"
                 for c in restore_cmds[:10]:
-                    log("♻️ " + c.strip())
+                    log("♻️ " + c.strip(), "bulk")
                 if len(restore_cmds) > 10:
-                    log(f"♻️ … 共 {len(restore_cmds)} 条回发命令（上面列出前 10 条）")
+                    log(f"♻️ … 共 {len(restore_cmds)} 条回发命令（上面列出前 10 条）", "bulk")
             else:
-                log(f"🗑️ 撤回 {len(withdrawn)} 条")
+                log(f"🗑️ 撤回 {len(withdrawn)} 条", "bulk")
             sse_broadcast_status()
             self.write({"status": "ok", "count": len(withdrawn), "groups": len(detail),
                         "restored": len(restored), "restored_sample": sorted(restored)[:10],
