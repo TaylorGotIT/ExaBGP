@@ -94,11 +94,11 @@ KPI 概览 · 邻居监控（前缀查询与逐邻居命令同一行）· 分类
 
 ```bash
 # ① 直接拉预构建镜像（推荐）
-docker pull ghcr.io/taylorgotit/exabgp:v6.2.0
+docker pull ghcr.io/taylorgotit/exabgp:v6.4.0
 
 # ② 离线包（Release 附件，适合内网）
-curl -LO https://github.com/TaylorGotIT/ExaBGP/releases/download/v6.2.0/exabgp-v6.2.0-image.tar.gz
-docker load -i exabgp-v6.2.0-image.tar.gz
+curl -LO https://github.com/TaylorGotIT/ExaBGP/releases/download/v6.4.0/exabgp-v6.4.0-image.tar.gz
+docker load -i exabgp-v6.4.0-image.tar.gz
 
 # ③ 自己构建
 git clone https://github.com/TaylorGotIT/ExaBGP.git && cd ExaBGP

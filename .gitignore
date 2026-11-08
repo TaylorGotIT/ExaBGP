@@ -20,3 +20,6 @@ v4/
 v5/
 demo-run/
 v6-pkg/
+
+# 打包产物
+dist/
