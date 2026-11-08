@@ -115,6 +115,8 @@
   .grp-row{cursor:pointer;user-select:none}
   .grp-row .fold{color:var(--muted);margin-right:6px;font-size:11px}
   .nb-up{color:var(--muted);font-size:11.5px;margin-left:6px}
+  .nb-sub{color:var(--muted);font-size:11px;margin-top:2px;font-family:Consolas,'Courier New',monospace;white-space:nowrap}
+  .nb-sub .sep-dot{margin:0 5px;opacity:.6}
   .nbresp-head.clamp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .nb-ledger{font-size:12px;color:var(--muted);margin:2px 0 6px;font-family:Consolas,'Courier New',monospace}
   .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
@@ -292,7 +294,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       <div class="tbl-wrap">
         <table class="tbl" id="nbTable">
           <colgroup>
-            <col style="width:190px"><col style="width:150px"><col style="width:120px"><col style="width:120px"><col>
+            <col style="width:185px"><col style="width:215px"><col style="width:120px"><col style="width:110px"><col>
           </colgroup>
           <thead>
             <tr><th>邻居 IP</th><th>状态</th><th class="num">已发布路由</th><th class="num">更新时间</th><th class="act">操作</th></tr>
@@ -1373,11 +1375,20 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const se=el("span","st "+(state==="Established"?"est":(state==="unknown"?"unknown":"bad")),
       state+(state==="unknown"?"（未响应）":""));
     cs.appendChild(se);
+    // 第一行：状态后面跟建立时长；第二行：收发计数
     const ud=st.updown&&st.updown!=="never"?st.updown:"";
-    if(ud){ const u=el("span","nb-up","↑"+ud); u.title="已建立时长（show neighbor summary）"; cs.appendChild(u); }
+    if(ud){
+      const u=el("span","nb-up","UP "+ud);
+      u.title="已建立时长（up/down 字段）";
+      cs.appendChild(u);
+    }
     if(st.msg_sent||st.msg_recvd){
-      const mc=el("span","nb-up","↑"+st.msg_sent+" ↓"+st.msg_recvd);
-      mc.title="收发消息计数（sent / recvd）"; cs.appendChild(mc);
+      const line2=el("div","nb-sub");
+      const mc=el("span",null,"KA "+st.msg_sent+"   UP "+st.msg_recvd);
+      mc.title="该会话的 BGP 报文计数：KA = sent（我们发出的报文数），UP = recvd（从对端收到的报文数）；"
+        +"报文含 KEEPALIVE/UPDATE/NOTIFICATION，不等于路由条数——路由看『已发布路由』列";
+      line2.appendChild(mc);
+      cs.appendChild(line2);
     }
     r.appendChild(cs);
     const rc=Number(st.rib_count||0);
