@@ -119,7 +119,7 @@
   .nb-ledger{font-size:12px;color:var(--muted);margin:2px 0 6px;font-family:Consolas,'Courier New',monospace}
   .nbq{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;vertical-align:middle;margin-right:10px}
   .nbq input{width:170px;flex:0 0 auto;height:26px;font-size:12px;font-family:Consolas,'Courier New',monospace}
-  .nbq .nbq-res{font-size:12px;font-family:Consolas,'Courier New',monospace;white-space:nowrap}
+  .nbq .nbq-res{font-size:12px;font-family:Consolas,'Courier New',monospace;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle}
   .nbresp{margin-top:4px}
   .nbresp-head{font-family:Consolas,'Courier New',monospace;font-size:11.5px;color:var(--green);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .nbresp-head:hover{color:var(--accent)}
@@ -1546,14 +1546,15 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     fetch(api("/api/adjrib?ip="+encodeURIComponent(ip)+"&prefix="+encodeURIComponent(p))).then(function(r){return r.json();}).then(function(d){
       if(d.status==="error"){appendLog("❌ "+(d.msg||"查询失败"));return;}
       const byModel=(d.source==="model");
-      const stale=!byModel && d.snapshot_age!=null && d.snapshot_age>300;   // 超过 5 分钟视为过期
-      const tail=byModel
-        ? "（按分组配置，非实际快照）"
-        : ("（快照 "+(d.snapshot_age!=null?fmtAge(d.snapshot_age):"—")+(stale?"，已过期建议点「核对」刷新":"")+"，共 "+d.count+" 条）");
-      const text=(d.found?"✅ ":"❌ ")+d.prefix+(d.found?" 已发布":" 未发布")+tail;
+      const stale=!byModel && d.snapshot_age!=null && d.snapshot_age>300;
+      const brief=(d.found?"✅ 已发布":"❌ 未发布")+(byModel?" · 按配置":(stale?" · 快照过期":" · 快照"));
       const color=d.found?((byModel||stale)?"var(--amber)":"var(--green)"):"var(--red)";
-      qr.textContent=text; qr.style.color=color;
-      qr.title=byModel?"还没有 adj-rib-out 快照，按分组配置推算；点该行 adj-rib-out 拉取真实发布表":"来自 exabgp show adj-rib out 实际快照";
+      qr.textContent=brief; qr.style.color=color;
+      qr.title=d.prefix+" · "+(d.found?"已发布":"未发布")+"\n"
+        + (byModel
+            ? "按分组配置推算（还没有 adj-rib-out 快照），点「核对」可拉取实际发布表"
+            : "来自 exabgp 实际快照"+(d.snapshot_age!=null?("（"+fmtAge(d.snapshot_age)+"）"):"")
+              +"\n共 "+d.count+" 条"+(stale?"\n快照已超过 5 分钟，建议点「核对」刷新":""));
       PREFIX_RESULT[ip]={prefix:p,text:text,color:color};
       appendLog("🔍 前缀查询: "+d.prefix+" @ "+d.ip+" → "+(d.found?"已发布":"未发布")+(byModel?"（按配置推算）":""),"control");
     }).catch(function(e){appendLog("❌ 查询失败: "+e.message);});
