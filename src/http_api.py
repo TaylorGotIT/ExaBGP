@@ -360,6 +360,7 @@ def handle_output_line(line):
         st0 = NEIGHBOR_STATES.setdefault(ip, {"state": "unknown", "adj_rib_out": [], "updated": time.time()})
         if p not in st0["adj_rib_out"]:
             st0["adj_rib_out"].append(p)
+        st0["rib_ts"] = time.time()      # 最近一次收到发布表快照的时间
         st0["updated"] = time.time()
         return
     m = re.match(r"^neighbor (\S+) adj-rib-out (\S+)(\s+.*)?$", line)
@@ -1822,9 +1823,21 @@ class AdjRibHandler(BaseHandler):
                 raise ValueError("需要 ip 与 prefix 参数，例如 /api/adjrib?ip=192.168.75.241&prefix=8.221.128.0/20")
             st = NEIGHBOR_STATES.get(ip, {})
             rib = st.get("adj_rib_out", [])
-            found = prefix in rib
-            log(f"🔍 {prefix} @ {ip}：{'已发布' if found else '未发布'}")
-            self.write({"status": "ok", "ip": ip, "prefix": prefix, "found": found, "count": len(rib)})
+            p = validate_prefix(prefix) or prefix
+            found = p in rib
+            source = "adj-rib"
+            age = int(time.time() - st["rib_ts"]) if st.get("rib_ts") else None
+            if not rib:
+                # 还没有发布表快照（从未执行过 adj-rib-out，或正在刷新）：按分组配置推算
+                model = set()
+                for g in GROUPS.values():
+                    if ip in g.get("neighbors", []):
+                        model |= routes_for_group(g["id"])
+                found = p in model
+                source = "model"
+            log(f"🔍 {prefix} @ {ip}：{'已发布' if found else '未发布'}（{source}）")
+            self.write({"status": "ok", "ip": ip, "prefix": p, "found": found,
+                        "source": source, "snapshot_age": age, "count": len(rib)})
         except Exception as e:
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})
