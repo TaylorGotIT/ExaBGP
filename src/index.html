@@ -351,7 +351,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     <div class="tbl-wrap">
       <table class="tbl">
         <colgroup>
-          <col style="width:10%"><col style="width:33%"><col style="width:11%"><col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:5%"><col style="width:17%">
+          <col style="width:9%"><col style="width:27%"><col style="width:20%"><col style="width:13%"><col style="width:6%"><col style="width:6%"><col style="width:5%"><col style="width:14%">
         </colgroup>
         <thead>
           <tr><th data-table="grp" data-sort="name">组名</th><th>邻居 IP（逗号分隔）</th><th>下一跳</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="ctr">启用</th><th class="act">操作</th></tr>
@@ -390,7 +390,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     <div class="tbl-wrap">
       <table class="tbl">
         <colgroup>
-          <col style="width:4%"><col style="width:24%"><col style="width:7%"><col style="width:14%"><col style="width:13%"><col style="width:8%"><col style="width:8%"><col style="width:22%">
+          <col style="width:4%"><col style="width:20%"><col style="width:7%"><col style="width:20%"><col style="width:12%"><col style="width:7%"><col style="width:7%"><col style="width:23%">
         </colgroup>
         <thead>
           <tr><th class="ctr">选择</th><th data-table="rg" data-sort="name">名称</th><th class="num" data-table="rg" data-sort="count">前缀数</th><th>下一跳（可选覆盖）</th><th>属性 community</th><th class="ctr">MED</th><th class="ctr">Prepends</th><th class="act">操作</th></tr>
@@ -936,6 +936,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const nm=el("input"); nm.value=g.name; nm.dataset.k="name"; nm.title=g.name;
       const nb=el("input"); nb.value=g.neighbors.join(","); nb.dataset.k="neighbors"; nb.title=(g.neighbors||[]).join(", ");
       const nh=el("input"); nh.value=g.next_hop; nh.dataset.k="next_hop"; nh.title=g.next_hop||"";
+      nh.style.fontSize="12px";
       const cm=el("input"); cm.value=g.community; cm.dataset.k="community"; cm.title=g.community||"";
       const md=el("input"); md.type="number"; md.min="0"; md.className="num-c"; md.placeholder="留空"; md.value=g.med||""; md.dataset.k="med";
       const pp=el("input"); pp.type="number"; pp.min="0"; pp.max="10"; pp.className="num-c"; pp.value=(g.prepend||0); pp.dataset.k="prepend";
@@ -1004,6 +1005,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const ch=el("input"); ch.type="checkbox"; ch.className="chk rg-chk"; ch.dataset.id=rg.id;
       const nm=el("input"); nm.value=rg.name; nm.dataset.k="name"; nm.title=rg.name;
       const nh=el("input"); nh.value=rg.next_hop; nh.dataset.k="next_hop"; nh.placeholder="留空 = 随目标组"; nh.title=rg.next_hop||"留空 = 随目标组";
+      nh.style.fontSize="12px";
       const cm=el("input"); cm.value=rg.community; cm.dataset.k="community"; cm.placeholder="留空 = 随目标组"; cm.title=rg.community||"留空 = 随目标组";
       const md=el("input"); md.type="number"; md.min="0"; md.className="num-c"; md.placeholder="随组"; md.value=rg.med||""; md.dataset.k="med";
       const pp=el("input"); pp.type="number"; pp.min="0"; pp.max="10"; pp.className="num-c"; pp.placeholder="随组"; pp.value=(rg.prepend?rg.prepend:""); pp.dataset.k="prepend";
