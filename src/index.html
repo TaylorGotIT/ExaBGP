@@ -1533,6 +1533,12 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     appendLog("🧪 核对 "+ip+"：应发 "+d.model+" / 实际 "+d.actual
       +(d.missing?(" / 缺 "+d.missing):"")+(d.extra?(" / 多 "+d.extra):""),"control");
   }
+  function fmtAge(sec){
+    if(sec==null) return "—";
+    if(sec<60) return sec+"s 前";
+    if(sec<3600) return Math.floor(sec/60)+" 分钟前";
+    return Math.floor(sec/3600)+" 小时前";
+  }
   function queryRowPrefix(ip,qi,qr){
     const p=qi.value.trim();
     if(!p){appendLog("⚠️ 请输入要查询的前缀（如 8.221.128.0/20）");return;}
@@ -1540,9 +1546,12 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     fetch(api("/api/adjrib?ip="+encodeURIComponent(ip)+"&prefix="+encodeURIComponent(p))).then(function(r){return r.json();}).then(function(d){
       if(d.status==="error"){appendLog("❌ "+(d.msg||"查询失败"));return;}
       const byModel=(d.source==="model");
-      const tail=byModel?"（按分组配置，非实际快照）":("（快照 "+(d.snapshot_age!=null?d.snapshot_age+"s 前":"—")+"，共 "+d.count+" 条）");
+      const stale=!byModel && d.snapshot_age!=null && d.snapshot_age>300;   // 超过 5 分钟视为过期
+      const tail=byModel
+        ? "（按分组配置，非实际快照）"
+        : ("（快照 "+(d.snapshot_age!=null?fmtAge(d.snapshot_age):"—")+(stale?"，已过期建议点「核对」刷新":"")+"，共 "+d.count+" 条）");
       const text=(d.found?"✅ ":"❌ ")+d.prefix+(d.found?" 已发布":" 未发布")+tail;
-      const color=d.found?(byModel?"var(--amber)":"var(--green)"):"var(--red)";
+      const color=d.found?((byModel||stale)?"var(--amber)":"var(--green)"):"var(--red)";
       qr.textContent=text; qr.style.color=color;
       qr.title=byModel?"还没有 adj-rib-out 快照，按分组配置推算；点该行 adj-rib-out 拉取真实发布表":"来自 exabgp show adj-rib out 实际快照";
       PREFIX_RESULT[ip]={prefix:p,text:text,color:color};
