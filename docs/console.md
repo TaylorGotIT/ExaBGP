@@ -29,8 +29,8 @@
 按**分组**分块展示邻居，每个邻居一行：
 
 ```
-邻居 IP | 状态 | 已发布路由 | 更新时间 | 操作(adj-rib-out / show route / show neighbor / teardown)
-前缀 [输入框] [查询] ✅/❌ 结果  ← 与 adj-rib-out / show route / show neighbor / teardown 同一行
+邻居 IP | 状态 | 已发布路由 | 更新时间 | 操作(核对 / show neighbor / teardown)
+前缀 [输入框] [查询] ✅/❌ 结果  ← 与 核对 / show neighbor / teardown 同一行
 ▶ 最新: [HH:MM:SS] 命令回显（点击展开最近 10 条）
 ```
 
@@ -44,8 +44,7 @@
 
 | 按钮 | 实际命令 | 用途 |
 |---|---|---|
-| `adj-rib-out` | `show adj-rib out` | 看已发布路由明细 |
-| `show route` | `show adj-rib out`（exabgp 4.x 无 `show route`） | 同上，兼容旧习惯 |
+| `核对` | `show adj-rib out` + 与分组配置比对 | 拉发布表并找出差异（缺发/多发） |
 | `show neighbor` | `show neighbor` | 会话参数/统计 |
 | `teardown` | `teardown` | 拆会话触发重连（慎用） |
 
@@ -150,7 +149,7 @@
 
 **搜索与排序**：右上角搜索框可按组名 / IP / 前缀 / URL 过滤三张表；表头（名称、间隔、前缀数）可点击排序。
 
-> 「已发布路由」列：有实际快照时显示 exabgp 的真实条数；没有快照时按分组配置推算（灰色数字，悬停提示"按分组配置计算"），点该行 `adj-rib-out` 可拉取真实发布表。
+> 「已发布路由」列：有实际快照时显示 exabgp 的真实条数；没有快照时按分组配置推算（灰色数字，悬停提示"按分组配置计算"），点该行「核对」可拉取真实发布表并比对差异。
 
 ## 10. 下发预演 / 前缀预检 / 导出 / 配置预览
 

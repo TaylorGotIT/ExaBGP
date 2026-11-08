@@ -280,7 +280,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
   <section class="panel">
     <div class="panel-head">
       <h2>邻居监控 &amp; 运行时控制</h2>
-      <span class="hint">按组分类 · adj-rib-out / show route / show neighbor / teardown</span>
+      <span class="hint">按组分类 · 前缀查询 / 核对 / show neighbor / teardown</span>
       <span class="spacer"></span>
       <label class="inline" for="monitorInterval">轮询间隔</label>
       <input id="monitorInterval" type="number" min="5" max="3600" value="30" style="width:88px">
@@ -1408,7 +1408,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const vbtn=el("button","sm","核对"); vbtn.title="拉一次发布表快照，并与分组配置比对，找出差异";
     vbtn.onclick=function(){ verifyNeighbor(ip,vbtn); };
     ca.appendChild(vbtn);
-    [["adj-rib-out","show_adj_rib_out"],["show route","show_route"],["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
+    [["show neighbor","show_neighbor"],["teardown","teardown"]].forEach(function(pair){
       const b=el("button","sm"+(pair[1]==="teardown"?" danger":""),pair[0]);
       b.onclick=function(){
         if(pair[1]==="teardown"){ requestTeardown(ip,b); }
