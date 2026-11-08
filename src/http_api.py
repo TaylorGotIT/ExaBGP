@@ -1163,6 +1163,17 @@ class SourcesApiHandler(BaseHandler):
                 s["next_due"] = 0
                 ioloop.add_callback(source_refresh_job, sid)
                 self.write({"status": "ok", "id": sid})
+            elif action == "reannounce":
+                gid = data["id"]
+                g = GROUPS.get(gid)
+                if not g:
+                    raise ValueError(f"分组 {gid} 不存在")
+                if not g["enabled"]:
+                    raise ValueError(f"分组 [{g['name']}] 已停用，请先启用")
+                n = len(routes_for_group(gid))
+                await announce_union_to_group(gid)
+                log(f"📢 分组 {g['name']} 手动重发 {n} 条")
+                self.write({"status": "ok", "id": gid, "count": n})
             elif action == "delete":
                 sid = data["id"]
                 if sid not in SOURCES:
@@ -1535,21 +1546,46 @@ class BulkWithdrawHandler(BaseHandler):
             routes = expand_withdraw_routes(data)
             if not routes:
                 raise ValueError("没有可撤回的路由（routes 或 route_groups 为空）")
+            # 撤回语义：先撤掉这批前缀（含路由组覆盖的那份属性），
+            # 若某些前缀仍在数据源覆盖范围内，立即按【分组属性】重新下发一份，
+            # 相当于把路由组的覆盖撤掉、回落到数据源版本。
             cmds = []
             detail = []
+            restored = set()
+            withdrawn = set()
+            restore_cmds = []
             for g in resolve_targets(data):
+                visible = routes_for_group(g["id"])
+                back = [r for r in routes if r in visible]
                 detail.append({"group": g["name"], "neighbors": g["neighbors"],
-                               "next_hop": g["next_hop"], "community": g["community"], "routes": list(routes)})
+                               "next_hop": g["next_hop"], "community": g["community"],
+                               "routes": list(routes), "restored": back})
+                restored |= set(back)
+                withdrawn |= set(routes)
                 for n in g["neighbors"]:
                     for r in routes:
                         cmds.append(f"neighbor {n} withdraw route {r}\n")
+                    for r in back:
+                        restore_cmds.append(announce_command(
+                            n, r, g["next_hop"], g.get("community", ""),
+                            g.get("med", ""), g.get("prepend", 0), g.get("local_as")))
             if data.get("dry_run"):
-                self.write({"status": "ok", "dry_run": True, "count": len(routes), "groups": len(detail),
-                            "commands_total": len(cmds), "commands": cmds[:50], "detail": detail})
+                self.write({"status": "ok", "dry_run": True, "count": len(withdrawn), "groups": len(detail),
+                            "restored": len(restored), "restored_sample": sorted(restored)[:10],
+                            "commands_total": len(cmds) + len(restore_cmds),
+                            "commands": (cmds[:25] + restore_cmds[:25]), "detail": detail})
                 return
             await asyncio.to_thread(write_to_pipe, cmds)
+            if restore_cmds:
+                await asyncio.to_thread(write_to_pipe, restore_cmds)
+            if restored:
+                log(f"🗑️ 撤回 {len(withdrawn)} 条；其中 {len(restored)} 条数据源仍覆盖，已按分组属性回发")
+            else:
+                log(f"🗑️ 撤回 {len(withdrawn)} 条")
             sse_broadcast_status()
-            self.write({"status": "ok", "count": len(routes), "groups": len(detail), "detail": detail})
+            self.write({"status": "ok", "count": len(withdrawn), "groups": len(detail),
+                        "restored": len(restored), "restored_sample": sorted(restored)[:10],
+                        "detail": detail})
         except Exception as e:
             self.set_status(500)
             self.write({"status": "error", "msg": str(e)})

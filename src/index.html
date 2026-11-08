@@ -949,12 +949,17 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       const c6=cell("ctr"); c6.appendChild(pp);
       const c7=cell("ctr"); c7.appendChild(en);
       const c8=cell("act");
+      const rs=el("button","sm","重发"); rs.title="按当前属性重新下发该组可见的全部路由（用于手动撤回后恢复）"; rs.onclick=function(){reannounceGroup(g,rs);};
       const sv=el("button","sm","保存"); sv.onclick=function(){saveGroup(g,tr,sv);};
       const dl=el("button","sm danger","删除"); dl.onclick=function(){requestDeleteGroup(g,dl);};
-      c8.appendChild(sv); c8.appendChild(dl);
+      c8.appendChild(rs); c8.appendChild(sv); c8.appendChild(dl);
       [c1,c2,c3,c4,c5,c6,c7,c8].forEach(function(c){tr.appendChild(c);});
       body.appendChild(tr);
     });
+  }
+  function reannounceGroup(g,btn){
+    return busy(btn,function(){return post("/api/groups",{action:"reannounce",id:g.id});})
+      .then(function(j){ if(j){ toast("已重发「"+g.name+"」"+j.count+" 条","ok"); loadStatus(); } });
   }
   async function saveGroup(g,tr,btn){
     const row=readRow(tr);
@@ -1275,7 +1280,16 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     }
     const url=act==="announce"?"/bulk/announce":"/bulk/withdraw";
     const j=await busy(btn,function(){return post(url,body);});
-    if(j){ showBulk(j,act); toast((act==="announce"?"已发布 ":"已撤回 ")+ids.length+" 个路由组（"+total+" 条前缀）","ok"); }
+    if(j){
+      showBulk(j,act);
+      const back=Number(j.restored||0);
+      if(act==="withdraw" && back>0){
+        toast("已撤回 "+(j.count||0)+" 条，其中 "+back+" 条已按分组属性回发","ok");
+        appendLog("🗑️ 撤回 "+(j.count||0)+" 条；"+back+" 条数据源仍覆盖，已按分组属性回发","withdraw");
+      }else{
+        toast((act==="announce"?"已发布 ":"已撤回 ")+ids.length+" 个路由组（"+total+" 条前缀）","ok");
+      }
+    }
   }
 
   // ---------- 邻居监控 & 运行时控制 ----------
