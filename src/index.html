@@ -1427,6 +1427,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     // 前缀查询与其它邻居操作放同一行
     const q=el("div","nbq");
     const qi=el("input"); qi.type="text"; qi.placeholder="前缀，如 8.221.128.0/20 或 2001:db8::/32";
+    qi.dataset.ip=ip; qi.dataset.k="prefix";
     qi.value=PREFIX_INPUT[ip]!=null?PREFIX_INPUT[ip]:((PREFIX_RESULT[ip]||{}).prefix||"");
     qi.oninput=function(){PREFIX_INPUT[ip]=qi.value;};
     const qb=el("button","sm","查询"); qb.title="查询该前缀是否已发布";
@@ -1494,8 +1495,20 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       if(d.status==="error")return;
       LAST_NEIGHBORS=d;
       updateAlerts();
-      if(nbEditing()){ updateLedgerLines(d); renderNeighborResp(); return; }
+      // 重绘会重建 DOM：先记下正在编辑的输入框，重绘后把焦点和光标位置还回去
+      const act=document.activeElement;
+      const keep=(act && act.tagName==="INPUT" && act.closest && act.closest("#nbTable"))
+        ? {ip:act.dataset.ip||"", k:act.dataset.k||"", pos:act.selectionStart, val:act.value}
+        : null;
       renderNeighbors(d);
+      if(keep && keep.ip){
+        const again=document.querySelector('#nbTable input[data-ip="'+keep.ip+'"][data-k="'+keep.k+'"]');
+        if(again){
+          if(keep.val!==undefined && again.value!==keep.val) again.value=keep.val;
+          again.focus();
+          try{ again.setSelectionRange(keep.pos||0, keep.pos||0); }catch(e){}
+        }
+      }
     }).catch(function(){});
   }
   function ctl(action,ip){
