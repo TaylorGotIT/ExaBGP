@@ -294,7 +294,7 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
       <div class="tbl-wrap">
         <table class="tbl" id="nbTable">
           <colgroup>
-            <col style="width:185px"><col style="width:215px"><col style="width:120px"><col style="width:110px"><col>
+            <col style="width:180px"><col style="width:245px"><col style="width:115px"><col style="width:105px"><col>
           </colgroup>
           <thead>
             <tr><th>邻居 IP</th><th>状态</th><th class="num">已发布路由</th><th class="num">更新时间</th><th class="act">操作</th></tr>
@@ -1375,21 +1375,18 @@ cursor:pointer;font-size:12.5px;color:var(--text)}
     const se=el("span","st "+(state==="Established"?"est":(state==="unknown"?"unknown":"bad")),
       state+(state==="unknown"?"（未响应）":""));
     cs.appendChild(se);
-    // 第一行：状态后面跟建立时长；第二行：收发计数
+    // 第二行：建立时长 + 报文计数（同一行，不换行）
     const ud=st.updown&&st.updown!=="never"?st.updown:"";
-    if(ud){
-      const u=el("span","nb-up","UP "+ud);
-      u.title="已建立时长（up/down 字段）";
-      cs.appendChild(u);
-    }
-    if(st.msg_sent||st.msg_recvd){
-      const line2=el("div","nb-sub");
-      const mc=el("span",null,"ST "+st.msg_sent+"   RC "+st.msg_recvd);
-      mc.title="该 BGP 会话的报文计数：ST(sent) = 我们发出的报文数，RC(recvd) = 从对端收到的报文数；"
-        +"报文含 KEEPALIVE/UPDATE/NOTIFICATION，不等于路由条数——路由看『已发布路由』列";
-      line2.appendChild(mc);
-      cs.appendChild(line2);
-    }
+    const line2=el("div","nb-sub");
+    const addSub=function(text,title){
+      if(line2.childNodes.length) line2.appendChild(el("span","sep-dot","·"));
+      const sp=el("span",null,text); if(title) sp.title=title; line2.appendChild(sp);
+    };
+    if(ud) addSub("UP "+ud,"已建立时长（up/down 字段）");
+    if(st.msg_sent||st.msg_recvd)
+      addSub("ST "+st.msg_sent+"  RC "+st.msg_recvd,
+        "报文计数：ST(sent)=我们发出的、RC(recvd)=从对端收到的；含 KEEPALIVE/UPDATE，不等于路由条数");
+    if(line2.childNodes.length) cs.appendChild(line2);
     r.appendChild(cs);
     const rc=Number(st.rib_count||0);
     const ribCell=cell("num", rc>0 ? (rc+" 条") : "—");
