@@ -1163,17 +1163,6 @@ class SourcesApiHandler(BaseHandler):
                 s["next_due"] = 0
                 ioloop.add_callback(source_refresh_job, sid)
                 self.write({"status": "ok", "id": sid})
-            elif action == "reannounce":
-                gid = data["id"]
-                g = GROUPS.get(gid)
-                if not g:
-                    raise ValueError(f"分组 {gid} 不存在")
-                if not g["enabled"]:
-                    raise ValueError(f"分组 [{g['name']}] 已停用，请先启用")
-                n = len(routes_for_group(gid))
-                await announce_union_to_group(gid)
-                log(f"📢 分组 {g['name']} 手动重发 {n} 条")
-                self.write({"status": "ok", "id": gid, "count": n})
             elif action == "delete":
                 sid = data["id"]
                 if sid not in SOURCES:
@@ -1284,6 +1273,17 @@ class GroupsApiHandler(BaseHandler):
                 ioloop.add_callback(regenerate_conf, f"更新分组 {g['name']}")
                 log(f"✏️ 分组 {g['name']}")
                 self.write({"status": "ok", "id": gid})
+            elif action == "reannounce":
+                gid = data["id"]
+                g = GROUPS.get(gid)
+                if not g:
+                    raise ValueError(f"分组 {gid} 不存在")
+                if not g["enabled"]:
+                    raise ValueError(f"分组 [{g['name']}] 已停用，请先启用")
+                n = len(routes_for_group(gid))
+                await announce_union_to_group(gid)
+                log(f"📢 分组 {g['name']} 手动重发 {n} 条")
+                self.write({"status": "ok", "id": gid, "count": n})
             elif action == "delete":
                 gid = data["id"]
                 if gid not in GROUPS:
