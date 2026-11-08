@@ -260,6 +260,23 @@ display bgp all summary
 
 > **注意下一跳**：v6 路由的下一跳必须在 CE 侧可达。若填注入机自己的 v6 地址，CE 会把该网段流量送到注入机（等于黑洞）；生产环境请填真实的 v6 出口网关。
 
+#### 踩坑记录：CE 的 v6 地址显示 `[DUPLICATE]`
+
+配了 `fd08:93db:7bf9::1/64` 后 `display ipv6 interface` 显示 `[DUPLICATE]`，表现是 CE **ping 不通同网段的 v6 地址**、BGP v6 路由也装不进表。
+
+原因：网段里已有其它设备占用该地址（DAD 检测到冲突），CE 的全局地址被判无效，发不出 v6 报文。
+
+排查与修复：
+
+```
+display ipv6 interface Vlanif75        # 看 Global unicast address 后面有没有 [DUPLICATE]
+display ipv6 neighbors                 # 看冲突设备的 MAC
+```
+
+换一个未占用的地址即可（如 `::241`），随后 `ping ipv6` 通、`display ipv6 routing-table` 出现 `Protocol : EBGP` 的条目。
+
+> 小技巧：`ping ipv6 -a <本端地址> <对端>` 可指定源地址；链路本地地址要带出接口 `ping ipv6 -i Vlanif75 fe80::...`。
+
 ## 9. 注意事项
 
 1. **改属性要重播**：分组属性保存后引擎会自动对该组重播全库；路由组属性只在"发布选中路由组"时生效。
